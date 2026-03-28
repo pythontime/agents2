@@ -23,10 +23,12 @@ def get_checkpointer(data_dir: Path):
         langgraph.checkpoint.sqlite.SqliteSaver instance.
     """
     from langgraph.checkpoint.sqlite import SqliteSaver
+    import sqlite3
 
     data_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_db = data_dir / "checkpoints.db"
-    return SqliteSaver.from_conn_string(str(checkpoint_db))
+    conn = sqlite3.connect(str(checkpoint_db), check_same_thread=False)
+    return SqliteSaver(conn)
 
 
 def make_thread_config(session_id: str) -> dict:

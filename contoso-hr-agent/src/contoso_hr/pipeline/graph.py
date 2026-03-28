@@ -379,9 +379,11 @@ def create_hr_graph(data_dir: Path):
         Compiled LangGraph StateGraph.
     """
     from langgraph.checkpoint.sqlite import SqliteSaver
+    import sqlite3
 
     data_dir.mkdir(parents=True, exist_ok=True)
-    checkpointer = SqliteSaver.from_conn_string(str(data_dir / "checkpoints.db"))
+    conn = sqlite3.connect(str(data_dir / "checkpoints.db"), check_same_thread=False)
+    checkpointer = SqliteSaver(conn)
 
     builder = StateGraph(HRState)
 
