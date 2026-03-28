@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "azure": {
+      "command": "npx",
+      "args": ["-y", "@azure/mcp@latest", "server", "start"],
+      "comment": "Azure MCP Server — provision/inspect Azure AI Foundry resources"
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "comment": "Brave Search MCP — web search for candidate research"
+    },
+    "contoso-hr": {
+      "command": "uv",
+      "args": ["run", "hr-mcp"],
+      "cwd": ".",
+      "comment": "Contoso HR Agent MCP server (FastMCP 2, SSE on port 8081)"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+================================================================================
+DAVID KIM — FINANCE & OPERATIONS PROFESSIONAL
+david.kim@gmail.com | (212) 555-0461 | New York, NY
+LinkedIn: linkedin.com/in/davidkim-finance
+================================================================================
+
+PROFESSIONAL SUMMARY
+--------------------------------------------------------------------
+Senior finance and operations leader with 12 years managing complex analytical
+projects at top-tier investment banks. Seeking a career pivot into the technology
+training space, motivated by a passion for explaining complex concepts clearly.
+No formal Microsoft certifications or technical training delivery experience
+to date, but enrolled in AZ-900 prep and committed to upskilling quickly.
+
+CERTIFICATIONS
+--------------------------------------------------------------------
+* CFA Charterholder — 2016
+* Series 7 — Expired 2025
+* Series 63 — Expired 2025
+* AZ-900 Azure Fundamentals — In progress (exam scheduled May 2026)
+
+PROFESSIONAL EXPERIENCE
+--------------------------------------------------------------------
+Vice President, Financial Analysis — Goldman Sachs, New York NY (2018 - 2025)
+* Led team of 4 analysts producing daily P&L and risk reports for equity
+  derivatives desk ($2B AUM)
+* Delivered internal presentations and workshops to C-suite stakeholders on
+  model assumptions and risk scenarios
+* Managed implementation of new data warehouse; liaised with engineering team
+  on requirements (no hands-on technical delivery role)
+
+Associate, Investment Banking — JPMorgan Chase, New York NY (2015 - 2018)
+* Prepared client-facing pitch decks and financial models for M&A transactions
+* Strong executive presentation and communication skills developed through
+  Fortune 500 client engagements
+
+Financial Analyst — Citigroup, New York NY (2013 - 2015)
+* Financial modeling and variance analysis for fixed income products
+* Automated reporting with Excel VBA macros
+
+TECHNICAL SKILLS
+--------------------------------------------------------------------
+* Advanced Excel (VBA, Power Query, pivot tables)
+* SQL — intermediate (self-taught via Coursera, 2023)
+* Python — beginner (pandas/NumPy via online tutorials)
+* Bloomberg Terminal, Salesforce, Tableau
+
+EDUCATION
+--------------------------------------------------------------------
+MBA, NYU Stern School of Business, 2013
+BA Economics (Honors), Columbia University, 2011
+
+NOTE
+--------------------------------------------------------------------
+Strong communicator and project manager with zero Microsoft technical
+certifications and no prior formal training delivery experience. Would require
+significant time and investment to reach Contoso trainer baseline. Recommend
+revisiting after AZ-900 completion and initial MCT readiness program.
+
+================================================================================

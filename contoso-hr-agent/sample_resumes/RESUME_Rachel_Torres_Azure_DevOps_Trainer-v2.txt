@@ -1,0 +1,59 @@
+================================================================================
+RACHEL TORRES — AZURE DEVOPS SPECIALIST & TECHNICAL TRAINER
+rachel.torres@outlook.com | (480) 555-0731 | Scottsdale, AZ
+LinkedIn: linkedin.com/in/racheltorres-devops
+================================================================================
+
+PROFESSIONAL SUMMARY
+--------------------------------------------------------------------
+Azure DevOps specialist with 6 years of hands-on engineering experience and a
+growing passion for technical education. Recently transitioned to part-time
+training delivery while maintaining consulting work. Strong technical depth in
+CI/CD, IaC, and Azure DevOps Services but still building classroom experience.
+
+MICROSOFT CERTIFICATIONS
+--------------------------------------------------------------------
+* Azure DevOps Engineer Expert (AZ-400) — Earned 2022
+* Azure Administrator Associate (AZ-104) — Earned 2021
+* Azure Fundamentals (AZ-900) — Earned 2020
+
+OTHER CERTIFICATIONS
+--------------------------------------------------------------------
+* Certified Kubernetes Administrator (CKA) — 2023
+* HashiCorp Terraform Associate — 2022
+* GitHub Actions Certified — 2024
+
+TRAINING DELIVERY EXPERIENCE
+--------------------------------------------------------------------
+Part-Time Workshop Facilitator — Coursera / Independent (2024 - Present)
+* Developed and delivered 2 workshops on Azure DevOps pipelines (4-hour format)
+* Led 3 internal lunch-and-learn sessions at previous employer on IaC
+* Positive informal feedback but no formal evaluation scores yet
+* Total classroom hours: approximately 40
+
+PROFESSIONAL EXPERIENCE
+--------------------------------------------------------------------
+Senior DevOps Engineer — American Express (2021 - Present)
+* Architect CI/CD pipelines serving 200+ microservices across Azure
+  Kubernetes Service
+* Lead infrastructure-as-code initiatives using Terraform and Bicep
+* Mentored 5 junior engineers through onboarding and skill development
+
+DevOps Engineer — Insight Enterprises (2019 - 2021)
+* Built and maintained Azure DevOps pipelines for enterprise clients
+* Automated cloud provisioning reducing deployment time by 60%
+
+TECHNICAL SPECIALTIES
+--------------------------------------------------------------------
+* Azure DevOps Services
+* CI/CD Pipeline Architecture
+* Terraform & Bicep
+* AKS & Container Orchestration
+* GitHub Actions
+* ARM Templates
+
+EDUCATION
+--------------------------------------------------------------------
+BS Computer Engineering, Arizona State University, 2019
+
+================================================================================

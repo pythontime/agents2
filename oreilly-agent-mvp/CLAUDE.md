@@ -1,97 +1,74 @@
 # CLAUDE.md
 
-This file provides guidance for Claude Code when working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Build & Run Commands
+> The root `../CLAUDE.md` contains the full architecture and command reference. This file adds context specific to working inside `oreilly-agent-mvp/` directly.
+
+## Commands (from this directory)
 
 ```bash
-# Setup (Windows PowerShell)
-.\scripts\setup.ps1              # Creates venv, installs dependencies
+# Setup
+.\scripts\setup.ps1              # Windows: venv + deps
+./scripts/setup.sh               # Linux/macOS
 
-# Run pipeline once
-.\scripts\run_once.ps1           # Uses mock issue
-.\scripts\run_once.ps1 mock_issues/issue_002.json  # Specific file
+# Run
+agent-menu                       # Interactive launcher
+agent-mvp                        # Process one mock issue
+agent-watcher                    # Start folder watcher
+agent-mcp                        # Start MCP server
 
-# Run folder watcher (auto-processes incoming/)
-.\scripts\run_watcher.ps1
+# Specific mock file or GitHub issue
+python -m agent_mvp.pipeline.run_once --source mock --mock-file mock_issues/issue_002.json
+python -m agent_mvp.pipeline.run_once --source github --repo owner/repo --issue 123
 
-# Tests
-pytest                           # Run all tests
-pytest --cov=agent_mvp          # With coverage
-pytest tests/test_schema.py -v  # Single test file
-
-# Linting
-ruff check src/ tests/          # Check for issues
-ruff format src/ tests/         # Format code
+# Test & lint
+pytest
+pytest --cov=agent_mvp
+pytest tests/test_schema.py -v
+ruff check src/ tests/
+ruff format src/ tests/
 ```
 
 ## Architecture
 
-This is an AI agents demo teaching orchestration patterns using LangGraph and CrewAI.
-
 ### Pipeline Flow
 
 ```
-Issue JSON → [load_issue] → [pm] → [dev] → [qa] → [finalize] → Result JSON
+Issue JSON
+  → [load_issue] → [pm] → [dev] → [qa] → [finalize]
+  → outgoing/{issue_id}_{timestamp}.json + SQLite
 ```
 
-The pipeline is defined in `src/agent_mvp/pipeline/graph.py` using LangGraph's `StateGraph`. Each node represents an agent stage:
-
-- **load_issue**: Validates the input Issue JSON
-- **pm**: PM agent analyzes issue, creates acceptance criteria and plan
-- **dev**: Dev agent implements the plan with code drafts
-- **qa**: QA agent reviews implementation, gives pass/fail/needs-human verdict
-- **finalize**: Assembles PipelineResult JSON
+Pipeline is `src/agent_mvp/pipeline/graph.py` (LangGraph `StateGraph`, 5 nodes).
 
 ### Key Files
 
 | Path | Purpose |
 |------|---------|
-| `src/agent_mvp/pipeline/graph.py` | LangGraph state machine with 5 nodes |
-| `src/agent_mvp/pipeline/crew.py` | CrewAI agent/task definitions |
-| `src/agent_mvp/pipeline/prompts.py` | System prompts for each agent |
-| `src/agent_mvp/models.py` | Pydantic models: Issue, PMOutput, DevOutput, QAOutput, PipelineResult |
-| `src/agent_mvp/config.py` | Config loading, LLM provider factory |
-| `src/agent_mvp/watcher/folder_watcher.py` | Polls incoming/ for new issues |
-
-### Data Contracts
-
-All data flows through Pydantic models in `models.py`:
-
-- **Issue**: Input from mock files or MCP
-- **PMOutput**: summary, acceptance_criteria, plan, assumptions
-- **DevOutput**: files (path, content, language), notes
-- **QAOutput**: verdict (pass/fail/needs-human), findings, suggested_changes
-- **PipelineResult**: Combines all outputs with metadata
+| `src/agent_mvp/pipeline/graph.py` | LangGraph state machine |
+| `src/agent_mvp/pipeline/crew.py` | CrewAI variant (PM/Dev/QA personas) |
+| `src/agent_mvp/pipeline/prompts.py` | System prompts — edit to change agent behaviour |
+| `src/agent_mvp/models.py` | Pydantic v2: Issue → PMOutput → DevOutput → QAOutput → PipelineResult |
+| `src/agent_mvp/config.py` | Config + `get_llm()` provider factory |
+| `src/agent_mvp/mcp_server/server.py` | FastMCP tools exposed over stdio |
+| `src/agent_mvp/util/token_tracking.py` | Per-agent token + cost tracking |
 
 ### LLM Providers
 
-Configured via `LLM_PROVIDER` env var. The `Config.get_llm()` method returns a LangChain-compatible chat model:
+Set `LLM_PROVIDER` in `.env`: `anthropic` (default), `openai`, or `azure`. `Config.get_llm()` returns the matching LangChain chat model.
 
-- `anthropic`: Uses `langchain-anthropic` (default)
-- `openai`: Uses `langchain-openai`
-- `azure`: Uses `AzureChatOpenAI`
+### Data Models
 
-### Folder Watcher Pattern
+`models.py` defines the typed chain: `Issue → PMOutput → DevOutput → QAOutput → PipelineResult`. All inter-agent data must flow through these Pydantic v2 models.
 
-The watcher polls `incoming/` for JSON files:
-1. New file detected → validates against Issue schema
-2. Runs pipeline graph
-3. Writes result to `outgoing/{issue_id}_{timestamp}.json`
-4. Moves input to `processed/`
+### Folder Watcher
+
+Drop a valid Issue JSON into `incoming/` → watcher validates, runs pipeline, writes to `outgoing/`, archives to `processed/`.
 
 ## Code Style
 
-- Python 3.11+
-- Ruff for linting/formatting (line-length 100)
-- Pydantic v2 for all data models
-- Type hints throughout
-- Docstrings on public functions
-
-## Testing
-
-Tests are in `tests/` directory. Key patterns:
-- `test_schema.py`: Issue validation tests
-- `test_fs_moves.py`: File system utility tests
-
-Mock issues in `mock_issues/` are used for testing without API calls.
+- Python 3.11+, `snake_case`, 4-space indent
+- Ruff: line length 100, target `py311`, rules E/F/I/W
+- Type hints + Google-style docstrings on all public functions
+- No business logic in `__init__.py`
+- Tests use `mock_issues/` fixtures; no live API calls in unit tests

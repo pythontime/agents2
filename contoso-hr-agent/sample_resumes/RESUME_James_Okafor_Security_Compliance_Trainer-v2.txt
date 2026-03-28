@@ -1,0 +1,74 @@
+================================================================================
+JAMES OKAFOR — MICROSOFT SECURITY & COMPLIANCE TRAINER
+james.okafor@microsoft.com | (425) 555-0892 | Bellevue, WA
+LinkedIn: linkedin.com/in/jamesokafor-security
+================================================================================
+
+PROFESSIONAL SUMMARY
+--------------------------------------------------------------------
+Microsoft Certified Trainer and cybersecurity educator with 9 years of training
+delivery experience specializing in Microsoft Security, Compliance, and Identity
+solutions. Former Microsoft FTE who transitioned to full-time technical training.
+Known for scenario-based teaching methodology and real-world lab design.
+
+MICROSOFT CERTIFICATIONS
+--------------------------------------------------------------------
+* Microsoft Certified Trainer (MCT) — Active since 2018
+* Cybersecurity Architect Expert (SC-100) — Earned 2023
+* Identity and Access Administrator Associate (SC-300) — Earned 2021, Renewed 2024
+* Information Protection and Compliance Administrator Associate (SC-400) — Earned 2022
+* Security Operations Analyst Associate (SC-200) — Earned 2021
+* Azure Security Engineer Associate (AZ-500) — Earned 2020
+* Microsoft 365 Certified: Security Administrator Associate — Earned 2019
+
+OTHER CERTIFICATIONS
+--------------------------------------------------------------------
+* CISSP — Earned 2017, Active
+* CEH (Certified Ethical Hacker) — Earned 2016
+* GCIH (GIAC Certified Incident Handler) — Earned 2019
+
+TRAINING DELIVERY EXPERIENCE
+--------------------------------------------------------------------
+Principal Security Trainer — Quickstart Technologies (2020 - Present)
+* Deliver SC-100, SC-200, SC-300, SC-400, and AZ-500 courses to enterprise
+  and government clients
+* 300+ instructor-led sessions delivered with 4.9/5.0 average learner
+  satisfaction
+* Designed 12 custom security lab environments used across 8 training partners
+* Keynote speaker at Microsoft Ignite 2023 security training track
+* Authored "Hands-On Microsoft Security" supplemental courseware adopted by
+  15 ATPs
+
+Senior Security Trainer — Microsoft (2018 - 2020)
+* Delivered internal security training to Microsoft field engineers and partners
+* Developed training content for SC-300 and SC-200 launch readiness
+* Trained 1,000+ Microsoft employees on Zero Trust architecture
+
+Security Consultant — Deloitte (2015 - 2018)
+* Conducted security assessments and compliance audits for Fortune 500 clients
+* Led internal training sessions on identity management and threat protection
+
+TECHNICAL SPECIALTIES
+--------------------------------------------------------------------
+* Microsoft Defender Suite
+* Microsoft Entra ID
+* Microsoft Purview
+* Sentinel & KQL
+* Zero Trust Architecture
+* Compliance Manager
+* Cloud App Security
+
+DELIVERY PLATFORMS
+--------------------------------------------------------------------
+* Microsoft Official Curriculum
+* Quickstart Virtual Labs
+* Microsoft Learn Instructor-Led Training
+* Custom Enterprise Workshops
+* Conference Speaking (Ignite, RSA)
+
+EDUCATION
+--------------------------------------------------------------------
+MS Cybersecurity, Georgetown University, 2015
+BS Information Systems, Howard University, 2013
+
+================================================================================

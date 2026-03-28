@@ -1,0 +1,51 @@
+SARAH CHEN
+sarah.chen@outlook.com | (425) 555-0147 | Redmond, WA | linkedin.com/in/sarahchen-mct
+
+--------------------------------------------------------------------------------
+
+PROFESSIONAL SUMMARY
+
+Microsoft Certified Trainer (MCT) with 7 years delivering Azure infrastructure and 
+identity courses. Proven track record across classroom, virtual, and on-demand 
+platforms with consistently high learner satisfaction.
+
+--------------------------------------------------------------------------------
+
+MICROSOFT CERTIFICATIONS
+
+* Microsoft Certified Trainer (MCT) — Active since 2019
+* Azure Administrator Associate (AZ-104) — Earned 2020, Renewed 2024
+* Azure Solutions Architect Expert (AZ-305) — Earned 2022
+* Azure Network Engineer Associate (AZ-700) — Earned 2023
+* Microsoft 365 Certified: Enterprise Administrator Expert — Earned 2021
+
+OTHER CERTIFICATIONS
+
+* AWS Solutions Architect Associate — 2021
+* CompTIA Network+ — 2018
+* Certified Kubernetes Administrator (CKA) — 2023
+
+--------------------------------------------------------------------------------
+
+TRAINING DELIVERY EXPERIENCE
+
+Senior Technical Trainer — Opsgility / A Cloud Guru (2021 - Present)
+* Deliver AZ-104, AZ-305, and AZ-700 courses to enterprise cohorts of 20-40 learners
+* Authored 3 hands-on lab modules adopted across 12 delivery partners
+* 4.8/5.0 average learner satisfaction across 200+ sessions
+* Lead instructor for Microsoft-sponsored FastTrack training events
+
+Cloud Platform Instructor — Pluralsight (Contract, 2020 - Present)
+* Published 4 courses on Azure administration and hybrid identity
+* 85,000+ combined learners, consistently 4.5+ star ratings
+
+Technical Trainer — New Horizons Learning Centers (2018 - 2021)
+* Delivered MOC courses for Azure and M365, trained 500+ professionals across 6 offices
+
+--------------------------------------------------------------------------------
+
+EDUCATION
+
+BS Information Technology, University of Washington, 2017
+
+--------------------------------------------------------------------------------

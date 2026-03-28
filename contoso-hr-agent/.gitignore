@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+*.coverage
+htmlcov/
+
+# uv
+uv.lock
+
+# Environment
+.env
+
+# Runtime data (never commit)
+data/incoming/
+data/processed/
+data/outgoing/
+data/chroma/
+data/knowledge/
+data/chat_sessions/
+data/hr.db
+data/checkpoints.db
+data/*.db
+
+# OS
+.DS_Store
+Thumbs.db

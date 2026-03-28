@@ -1,0 +1,50 @@
+DAVID PARK
+david.park@outlook.com | (703) 555-0418 | Arlington, VA | linkedin.com/in/davidpark-security
+
+--------------------------------------------------------------------------------
+
+PROFESSIONAL SUMMARY
+
+Microsoft Certified Trainer specializing in Microsoft 365 security and identity 
+protection. 5 years of dedicated training delivery with 150+ instructor-led sessions 
+and consistently high ratings.
+
+--------------------------------------------------------------------------------
+
+MICROSOFT CERTIFICATIONS
+
+* Microsoft Certified Trainer (MCT) — Active since 2020
+* Identity and Access Administrator Associate (SC-300) — Earned 2021
+* Security Operations Analyst Associate (SC-200) — Earned 2022
+* Teams Administrator Associate (MS-700) — Earned 2021
+* Azure Security Engineer Associate (AZ-500) — Earned 2023
+
+--------------------------------------------------------------------------------
+
+TRAINING DELIVERY EXPERIENCE
+
+Senior Security Trainer — Infosec Institute (2021 - Present)
+* Deliver SC-300, SC-200, and AZ-500 courses to government and enterprise clients
+* 150+ instructor-led sessions delivered with 4.7/5.0 average rating
+* Developed 5 custom lab environments for security training scenarios
+* Mentored 3 junior trainers through MCT certification process
+
+Independent Training Contractor (2020 - 2021)
+* Delivered Microsoft security courses for training partners (New Horizons, Global Knowledge)
+* Created supplemental materials for SC-300 and MS-700 courses
+
+--------------------------------------------------------------------------------
+
+PROFESSIONAL EXPERIENCE
+
+Security Analyst — Booz Allen Hamilton (2018 - 2020)
+* Conducted security assessments for federal agency clients
+* Implemented Microsoft 365 security solutions for DoD environments
+
+--------------------------------------------------------------------------------
+
+EDUCATION
+
+BS Cybersecurity, George Mason University, 2018
+
+--------------------------------------------------------------------------------

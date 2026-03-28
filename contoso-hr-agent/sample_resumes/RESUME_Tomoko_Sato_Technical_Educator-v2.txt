@@ -1,0 +1,51 @@
+TOMOKO SATO
+tomoko.sato@gmail.com | (415) 555-0567 | San Francisco, CA | linkedin.com/in/tomokosato-edu
+
+--------------------------------------------------------------------------------
+
+PROFESSIONAL SUMMARY
+
+Award-winning technical educator with 10 years of university-level instruction and 
+published research in computer science pedagogy. Deep commitment to effective teaching 
+methodology. Currently pursuing role-based Microsoft certifications to complement 
+extensive teaching background.
+
+--------------------------------------------------------------------------------
+
+MICROSOFT CERTIFICATIONS
+
+* Azure Fundamentals (AZ-900) — Earned 2023
+* Security, Compliance, and Identity Fundamentals (SC-900) — Earned 2023
+* Currently studying for Azure Administrator Associate (AZ-104) — target date Q2 2026
+
+--------------------------------------------------------------------------------
+
+TEACHING EXPERIENCE
+
+Associate Professor of Computer Science — San Francisco State University (2016 - Present)
+* Teach undergraduate and graduate courses in cloud computing, operating systems, and distributed systems
+* 10 years of full-time instruction, 3,000+ students taught
+* Department Teacher of the Year Award, 2020 and 2023
+* Developed university's first cloud computing curriculum adopted by 3 other CSU campuses
+
+Visiting Lecturer — UC Berkeley Extension (2019 - 2022)
+* Taught professional development courses in cloud architecture
+* 4.9/5.0 average course evaluation across 12 sections
+
+--------------------------------------------------------------------------------
+
+PUBLICATIONS
+
+* "Effective Pedagogical Approaches for Cloud Computing Education" — ACM SIGCSE 2022
+* "Bridging Theory and Practice in Technical Training" — IEEE Frontiers in Education 2021
+* Co-author of "Cloud Computing: A Practical Approach" (O'Reilly Media, 2020)
+
+--------------------------------------------------------------------------------
+
+EDUCATION
+
+PhD Computer Science, Stanford University, 2014
+MS Computer Science, Stanford University, 2011
+BS Computer Science, University of Tokyo, 2009
+
+--------------------------------------------------------------------------------

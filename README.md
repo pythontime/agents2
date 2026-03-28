@@ -4,47 +4,99 @@
    <img src="images/cover.png" alt="Build Production-Ready AI Agents cover" width="360">
 </p>
 
-**O'Reilly Live Learning Course** | 4 Hours | LangGraph · CrewAI · MCP
+**O'Reilly Live Learning Course** | 4 Hours | LangGraph - CrewAI - MCP - Azure AI Foundry
 
 [![Website TechTrainerTim.com](https://img.shields.io/badge/Website-TechTrainerTim.com-0a66c2)](https://techtrainertim.com)
 [![LinkedIn timothywarner](https://img.shields.io/badge/LinkedIn-timothywarner-0a66c2?logo=linkedin)](https://www.linkedin.com/in/timothywarner/)
 [![GitHub timothywarner-org](https://img.shields.io/badge/GitHub-timothywarner--org-181717?logo=github)](https://github.com/timothywarner-org)
 [![O'Reilly Author Page](https://img.shields.io/badge/O'Reilly-Author%20Page-cf2f1d)](https://learning.oreilly.com/search/?query=Tim%20Warner)
 
-**Contact:** [Website](https://techtrainertim.com) · [LinkedIn](https://www.linkedin.com/in/timothywarner/) · [GitHub](https://github.com/timothywarner-org) · [O'Reilly](https://learning.oreilly.com/search/?query=Tim%20Warner)
+**Contact:** [Website](https://techtrainertim.com) | [LinkedIn](https://www.linkedin.com/in/timothywarner/) | [GitHub](https://github.com/timothywarner-org) | [O'Reilly](https://learning.oreilly.com/search/?query=Tim%20Warner)
 
 ---
 
-## 🎯 Course Overview
+## Course Overview
 
-A 4-hour hands-on workshop teaching you how to build, orchestrate, and deploy multi-agent AI systems using real production patterns. We'll explore existing agent tools, then build our own issue triage pipeline with PM, Dev, and QA agents working together.
+A 4-hour hands-on workshop teaching you how to build, orchestrate, and deploy multi-agent AI systems using real production patterns. The primary demo is the **Contoso HR Agent** -- an automated resume screening and HR policy Q&A system that showcases five core agent capabilities:
 
-**What You'll Learn:**
-- What AI agents actually are (beyond the hype)
-- How to use production agent tools (Copilot Studio, Claude Code)
-- Building multi-agent systems with LangGraph and CrewAI
-- Real-world orchestration patterns you can take to work Monday
+| Pillar | What it demonstrates |
+|--------|---------------------|
+| **(a) Interactive chat** | Web chat UI + FastAPI `/api/chat` backed by Azure AI Foundry |
+| **(b) Event-driven autonomy** | `ResumeWatcher` polls `data/incoming/` -- drop a resume, pipeline runs automatically |
+| **(c) Memory/state persistence** | LangGraph `SqliteSaver` checkpoints + SQLite candidate store |
+| **(d) LLM reasoning** | LangGraph StateGraph + 3 CrewAI agents (PolicyExpert, ResumeAnalyst, DecisionMaker) |
+| **(e) MCP tool calling** | FastMCP 2 server (SSE) + Brave Search API tool inside ResumeAnalyst agent |
 
-### 🔧 Tech Stack Snapshot
-- **LangGraph** — Orchestrates the PM→Dev→QA state machine that coordinates agent hand-offs.
-- **CrewAI** — Provides the collaborative crew framework behind the PM, Dev, and QA personas.
-- **FastMCP** — Exposes pipeline tools and data sources through a Model Context Protocol server.
-- **Pydantic** — Validates structured issue inputs and pipeline outputs with strict models.
-- **Rich** — Produces readable, structured logs for workshop demos and debugging.
-- **SQLite** — Stores run history and analytics with a lightweight embedded database.
-- **pytest** — Powers the automated regression suite learners can extend.
+### Tech Stack
 
-**What You'll Build:**
-- A 3-agent issue triage system (PM → Dev → QA)
-- GitHub integration for real issues
-- Event-driven processing pipeline
-- Your own agent playground to extend
+- **Python 3.11+** -- primary language
+- **LangGraph** -- StateGraph orchestration, state machine, checkpoints
+- **CrewAI** -- agent persona framework (PolicyExpert, ResumeAnalyst, DecisionMaker)
+- **Azure AI Foundry** -- LLM (GPT-4o) and embeddings (text-embedding-3-large)
+- **FastMCP 2** -- Model Context Protocol server (SSE transport)
+- **ChromaDB** -- vector store for HR policy RAG
+- **FastAPI** -- web server and REST API
 
 ---
 
-## 📚 Course Flow (4 Hours)
+## Quick Start
 
-### **Hour 1: Agent Fundamentals & Existing Tools** ⏱️ 0:00-1:00
+```bash
+# 1. Clone the repo
+git clone https://github.com/timothywarner-org/agents2.git
+cd agents2/contoso-hr-agent
+
+# 2. Run setup (requires uv package manager)
+.\scripts\setup.ps1         # Windows PowerShell
+./scripts/setup.sh          # Linux/macOS
+
+# 3. Configure .env
+# Set your Azure AI Foundry credentials:
+#   AZURE_AI_FOUNDRY_ENDPOINT, AZURE_AI_FOUNDRY_KEY,
+#   AZURE_AI_FOUNDRY_CHAT_MODEL, AZURE_AI_FOUNDRY_EMBEDDING_MODEL
+
+# 4. Start the application
+.\scripts\start.ps1         # Windows PowerShell
+./scripts/start.sh          # Linux/macOS
+
+# 5. Open the chat UI
+# http://localhost:8080/chat.html
+```
+
+See [contoso-hr-agent/README.md](contoso-hr-agent/README.md) for the full demo walkthrough and project details.
+
+---
+
+## Project Structure
+
+```
+agents2/
+├── README.md                      # <- You are here (course outline)
+├── contoso-hr-agent/              # <- Primary demo project
+│   ├── src/contoso_hr/            # Source code
+│   │   ├── pipeline/              # LangGraph + CrewAI orchestration
+│   │   ├── knowledge/             # ChromaDB vectorization + retrieval
+│   │   ├── memory/                # SQLite store + LangGraph checkpoints
+│   │   ├── mcp_server/            # FastMCP 2 (SSE, port 8081)
+│   │   ├── watcher/               # Resume file watcher
+│   │   └── engine.py              # FastAPI server (port 8080)
+│   ├── web/                       # HTML/JS/CSS frontend
+│   ├── sample_resumes/            # Trainer candidate resumes
+│   ├── sample_knowledge/          # HR policy docs
+│   ├── scripts/                   # Setup and launch scripts
+│   └── tests/                     # pytest tests
+├── oreilly-agent-mvp/             # Legacy reference (issue triage pipeline)
+├── docs/                          # Course materials and supporting assets
+└── images/                        # Course images
+```
+
+> **Note:** `oreilly-agent-mvp/` is retained as reference material from an earlier iteration of the course. It is not the primary demo. All learner-facing work should use `contoso-hr-agent/`.
+
+---
+
+## Course Flow (4 Hours)
+
+### Hour 1: Agent Fundamentals & Existing Tools (0:00-1:00)
 
 **What are AI Agents, Really?**
 - Definition: LLMs + Tools + Memory + Autonomy
@@ -68,160 +120,96 @@ A 4-hour hands-on workshop teaching you how to build, orchestrate, and deploy mu
 
 ---
 
-### **Hour 2: Our Agent System - Architecture & Setup** ⏱️ 1:00-2:00
+### Hour 2: Contoso HR Agent - Architecture & Setup (1:00-2:00)
 
 **The Big Picture**
-- Demo: Watch the full pipeline run (GitHub issue → PM → Dev → QA → Output)
+- Demo: Watch the full pipeline run (Resume upload -> PolicyExpert -> ResumeAnalyst -> DecisionMaker -> Result)
 - Architecture walkthrough: Why 3 agents? Why these roles?
 - LangGraph vs. CrewAI: When to use which framework
 
 **Hands-On: Get It Running (30 minutes)**
 - Clone the repo, run setup
-- Configure your API keys (we'll use Anthropic or OpenAI)
-- Run the interactive menu: `agent-menu`
-- Process your first mock issue
-- Inspect the output JSON
+- Configure Azure AI Foundry credentials
+- Start the engine and watcher
+- Upload a sample resume from `sample_resumes/`
+- View results on the candidates page
 
-**Code Walkthrough: The Bones (15 minutes)**
+**Code Walkthrough (15 minutes)**
 - `models.py`: Data flowing through the system
-- `config.py`: How we handle different LLM providers
-- `pipeline/graph.py`: The agent orchestration (high-level only)
-
-**Discussion: Decisions We Made**
-- Why PM → Dev → QA? (Could it be different?)
-- Why JSON files? (What else could we use?)
-- Cost vs. quality trade-offs
+- `config.py`: Azure AI Foundry configuration
+- `pipeline/graph.py`: The LangGraph StateGraph
 
 **Key Takeaway:** Understand the flow before diving into code.
 
 ---
 
-### **Hour 3: Agent Roles & Prompt Engineering** ⏱️ 2:00-3:00
+### Hour 3: Agent Roles & Prompt Engineering (2:00-3:00)
 
 **Deep Dive: The Three Agents**
-- **PM Agent:** Translating vague requests into clear requirements
-- **Dev Agent:** Code generation with practical constraints
-- **QA Agent:** Review that actually catches problems
+- **PolicyExpert:** ChromaDB RAG against HR policy documents
+- **ResumeAnalyst:** Skills evaluation with Brave Search verification
+- **DecisionMaker:** Final advance/hold/reject reasoning
 
 **Hands-On: Prompt Dissection (20 minutes)**
 - Open `pipeline/prompts.py`
-- Read the PM prompt together
-- Identify: System prompt vs. user prompt
+- Read the PolicyExpert prompt together
+- Identify: System prompt vs. task description
 - Spot the output structure requirements
 - See how context flows between agents
 
 **Hands-On: Modify a Prompt (25 minutes)**
-- Pick an agent (PM, Dev, or QA)
-- Change the tone or focus (e.g., make QA stricter)
-- Re-run the pipeline
-- Compare outputs in `outgoing/`
+- Pick an agent (PolicyExpert, ResumeAnalyst, or DecisionMaker)
+- Change the evaluation criteria or tone
+- Re-run the pipeline with a sample resume
+- Compare outputs
 - Discussion: What changed?
 
-**Hands-On: GitHub Integration (15 minutes)**
-- Set up your GitHub token
-- Fetch a real issue from `timothywarner-org/agents2`
-- Watch the agents process it
-- See how real data is messier than mocks
+**Hands-On: MCP Integration (15 minutes)**
+- Start the MCP server
+- Use MCP Inspector to call `list_candidates`, `query_policy`, `trigger_resume_evaluation`
+- See how MCP exposes the pipeline to external AI tools
 
 **Key Takeaway:** Prompts are code. Small changes = big impacts.
 
 ---
 
-### **Hour 4: Orchestration & Taking It Home** ⏱️ 3:00-4:00
+### Hour 4: Orchestration & Taking It Home (3:00-4:00)
 
 **LangGraph Orchestration**
-- State management: How data flows between agents
+- State management: HRState TypedDict flows between nodes
 - Nodes vs. edges (it's just a graph!)
+- SqliteSaver checkpoints: memory and replay
 - Error handling: What happens when agents fail?
-- Code walkthrough: `pipeline/graph.py` (the key parts)
 
-**CrewAI Alternative**
-- When would you use CrewAI instead?
-- Agent collaboration patterns
-- Code walkthrough: `pipeline/crew.py`
+**CrewAI Agent Patterns**
+- When would you use CrewAI vs. raw LangGraph?
+- One Crew per node pattern
+- Agent collaboration and tool binding
 
 **Hands-On: Extension Ideas (30 minutes)**
 
 *Pick ONE to try:*
 
-1. **Add a 4th agent** (Design, Security, or Documentation)
-   - Copy an existing agent
-   - Write a simple prompt
-   - Add to the graph
-   - Test it
-
-2. **Change the flow**
-   - Make Dev and QA run in parallel
-   - Add a "human approval" checkpoint
-   - Loop QA back to Dev if rejected
-
-3. **New input source**
-   - Fetch issues from YOUR repo
-   - Read from a CSV file
-   - Connect to Jira or Linear
-
-4. **Better outputs**
-   - Generate markdown reports
-   - Send Slack notifications
-   - Create GitHub comments
+1. **Add a 4th agent** (InterviewScheduler that proposes calendar slots)
+2. **Add a new tool** (Microsoft Graph for email notifications)
+3. **Upgrade the knowledge store** (Azure AI Search instead of ChromaDB)
+4. **New input source** (connect to an ATS or read resumes from SharePoint)
 
 **Production Considerations (10 minutes)**
-- Cost tracking (how much does this cost per issue?)
+- Cost tracking (Azure AI Foundry pricing)
 - Observability (logs, traces, metrics)
 - Rate limiting and retries
 - Security (secrets, data privacy)
-- Testing agent systems (it's harder than you think)
+- Testing agent systems
 
 **Wrap-Up: What's Next?**
-- Resources: LangGraph docs, CrewAI tutorials
+- Resources: LangGraph docs, CrewAI tutorials, Azure AI Foundry docs
 - Community: Where to get help
-- Your homework: Deploy this to production (we'll talk about how)
+- Your homework: Deploy this to production
 
 ---
 
-## 🚀 Quick Start (Before Class)
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/timothywarner-org/agents2.git
-cd agents2/oreilly-agent-mvp
-
-# 2. Run setup
-./scripts/setup.sh      # Mac/Linux/Git Bash
-.\scripts\setup.ps1     # Windows PowerShell
-
-# 3. Configure .env
-# Copy .env.example to .env
-# Add your ANTHROPIC_API_KEY or OPENAI_API_KEY
-
-# 4. Test it works
-agent-menu
-```
-
-**Stuck?** Check [oreilly-agent-mvp/README.md](oreilly-agent-mvp/README.md) for detailed docs.
-
----
-
-## 📂 Project Structure
-
-```
-agents2/
-├── README.md                      # ← You are here (course outline)
-└── oreilly-agent-mvp/            # ← The agent system
-    ├── README.md                  # Technical documentation
-    ├── src/agent_mvp/            # Source code
-    │   ├── pipeline/             # Agent orchestration
-    │   ├── cli/                  # Interactive menu
-    │   ├── integrations/         # GitHub API
-    │   └── watcher/              # Event-driven processing
-    ├── mock_issues/              # Sample data for practice
-    ├── scripts/                  # Helper scripts
-    └── tests/                    # Unit tests
-```
-
----
-
-## 🎓 Prerequisites
+## Prerequisites
 
 **You Should Have:**
 - Basic Python experience (if/else, functions, imports)
@@ -233,44 +221,47 @@ agents2/
 - Deep Python expertise
 - LangGraph or CrewAI experience
 - Machine learning knowledge
-- DevOps or cloud experience
+- Azure experience (we'll walk through setup)
 
 **Required Tools:**
 - Python 3.11+
+- [uv](https://docs.astral.sh/uv/) package manager
 - VS Code (recommended) or any editor
 - Git
-- API key from Anthropic OR OpenAI (free tier works)
-- Optional: GitHub Personal Access Token (for real issue fetching)
+- Azure AI Foundry account with a deployed chat + embedding model
+- Optional: Brave Search API key (for ResumeAnalyst web verification)
+- Optional: Node.js (for MCP Inspector)
 
 ---
 
-## 💡 Learning Outcomes
+## Learning Outcomes
 
 By the end of this course, you'll be able to:
 
-✅ **Explain** what AI agents are and when to use them
-✅ **Use** Copilot Studio and Claude Code effectively
-✅ **Build** a multi-agent system with clear roles
-✅ **Orchestrate** agents using LangGraph or CrewAI
-✅ **Write** effective prompts for agent personas
-✅ **Integrate** real data sources (GitHub, files, etc.)
-✅ **Deploy** event-driven agent workflows
-✅ **Extend** the system for your own use cases
+- **Explain** what AI agents are and when to use them
+- **Use** Copilot Studio and Claude Code effectively
+- **Build** a multi-agent system with clear roles (PolicyExpert, ResumeAnalyst, DecisionMaker)
+- **Orchestrate** agents using LangGraph with CrewAI personas
+- **Write** effective prompts for agent personas
+- **Integrate** tools via MCP and vector search via ChromaDB
+- **Deploy** event-driven agent workflows with file watchers and web UIs
+- **Extend** the system for your own use cases
 
 ---
 
-## 🔗 Resources
+## Resources
 
 **Documentation:**
-- [Full technical docs](oreilly-agent-mvp/README.md)
-- [Azure deployment architecture](docs/azure-architecture.md)
+- [Contoso HR Agent docs](contoso-hr-agent/README.md)
 - [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
 - [CrewAI Documentation](https://docs.crewai.com/)
+- [Azure AI Foundry Documentation](https://learn.microsoft.com/en-us/azure/ai-studio/)
+- [FastMCP Documentation](https://github.com/jlowin/fastmcp)
 
 **Code Examples:**
-- `oreilly-agent-mvp/mock_issues/` - Sample inputs
-- `oreilly-agent-mvp/src/agent_mvp/pipeline/` - Agent code
-- `oreilly-agent-mvp/outgoing/` - Sample outputs (after you run it)
+- `contoso-hr-agent/sample_resumes/` -- Sample trainer resumes
+- `contoso-hr-agent/sample_knowledge/` -- HR policy documents
+- `contoso-hr-agent/src/contoso_hr/pipeline/` -- Agent code
 
 **Community:**
 - Course Slack: (link provided in class)
@@ -278,44 +269,39 @@ By the end of this course, you'll be able to:
 
 ---
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
-**"Setup failed" or "pip install errors"**
+**"Setup failed" or "uv sync errors"**
 - Make sure Python 3.11+ is installed: `python --version`
-- Try: `python -m pip install --upgrade pip`
-- Still stuck? Use the Docker option (see technical docs)
+- Install uv: `pip install uv` or see [uv docs](https://docs.astral.sh/uv/)
+- Run `uv venv && uv sync` manually from `contoso-hr-agent/`
 
-**"API key not working"**
+**"Azure AI Foundry key not working"**
 - Check for typos in `.env` file
-- Anthropic keys start with `sk-ant-`
-- OpenAI keys start with `sk-`
-- Make sure there are no spaces or quotes around the key
+- Verify endpoint format: `https://YOUR-RESOURCE.openai.azure.com/`
+- Ensure your deployment names match `AZURE_AI_FOUNDRY_CHAT_MODEL` and `AZURE_AI_FOUNDRY_EMBEDDING_MODEL`
 
-**"Agent menu won't start"**
-- Did you activate the virtual environment? `source .venv/Scripts/activate`
-- Try: `python -m agent_mvp.cli.interactive_menu`
+**"Port already in use"**
+- The start scripts automatically kill ports 8080 and 8081 before starting
+- If issues persist, manually kill the process using the port
 
-**See full troubleshooting guide:** [oreilly-agent-mvp/README.md#troubleshooting](oreilly-agent-mvp/README.md#troubleshooting)
+**See full troubleshooting guide:** [contoso-hr-agent/README.md](contoso-hr-agent/README.md)
 
 ---
 
-## 📝 License & Usage
+## License & Usage
 
 MIT License - Feel free to use this code in your own projects!
 
-**Course Materials:** © 2026 Tim Warner / O'Reilly Media
+**Course Materials:** (c) 2026 Tim Warner / O'Reilly Media
 **Code:** Open source, use freely
 
 ---
 
-## 👨‍🏫 About the Instructor
+## About the Instructor
 
 **Tim Warner** teaches cloud, DevOps, and AI at O'Reilly, Pluralsight, and LinkedIn Learning.
 
 - [TechTrainerTim.com](https://TechTrainerTim.com)
 - [LinkedIn](https://linkedin.com/in/timothywarner)
 - [GitHub](https://github.com/timothywarner-org)
-
----
-
-**Ready to build some agents? Let's go! 🚀**

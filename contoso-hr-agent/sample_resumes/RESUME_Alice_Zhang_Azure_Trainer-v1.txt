@@ -1,0 +1,60 @@
+================================================================================
+ALICE ZHANG — MICROSOFT CERTIFIED TRAINER
+alice.zhang@outlook.com | (425) 555-0182 | Bellevue, WA
+LinkedIn: linkedin.com/in/alicezhang-mct
+================================================================================
+
+PROFESSIONAL SUMMARY
+--------------------------------------------------------------------
+Microsoft Certified Trainer (MCT) with 9 years of combined Azure engineering
+and technical training experience. Specializes in Azure infrastructure,
+hybrid identity, and DevOps Engineer courses. Known for translating complex
+architecture concepts into clear, hands-on lab exercises that stick. Consistent
+4.9/5.0 learner satisfaction across 250+ deliveries.
+
+MICROSOFT CERTIFICATIONS
+--------------------------------------------------------------------
+* Microsoft Certified Trainer (MCT) — Active since 2018
+* Azure Solutions Architect Expert (AZ-305) — Earned 2022, Renewed 2025
+* Azure Administrator Associate (AZ-104) — Earned 2020, Renewed 2024
+* Azure DevOps Engineer Expert (AZ-400) — Earned 2021
+* Azure Network Engineer Associate (AZ-700) — Earned 2023
+* Microsoft 365 Certified: Enterprise Administrator Expert — Earned 2022
+* Azure Fundamentals (AZ-900) — Earned 2018
+
+OTHER CERTIFICATIONS
+--------------------------------------------------------------------
+* Certified Kubernetes Administrator (CKA) — 2022
+* HashiCorp Terraform Associate — 2021
+* CompTIA Network+ — 2017
+
+TRAINING DELIVERY EXPERIENCE
+--------------------------------------------------------------------
+Principal Technical Trainer — Opsgility (2021 - Present)
+* Lead instructor for AZ-104, AZ-305, AZ-400, and AZ-700 across enterprise cohorts
+* Deliver 60+ training engagements annually to Fortune 500 clients
+* 4.9/5.0 average satisfaction across 250+ sessions; multiple Microsoft Partner
+  Trainer of the Year nominations
+* Developed 5 custom lab environments adopted by 20+ partner training organizations
+* Mentors 3 associate trainers; 2 have achieved MCT status under her guidance
+
+Senior Technical Trainer — Global Knowledge (2018 - 2021)
+* Delivered MOC and custom Azure curricula across 8 regional offices
+* Built out Azure virtual lab infrastructure supporting 400 concurrent learners
+* First trainer at the organization to achieve AZ-305 Expert credential
+
+Cloud Infrastructure Engineer — Northwind Traders, Seattle WA (2015 - 2018)
+* Designed and operated Azure IaaS/PaaS environments for 3,000-seat enterprise
+* Mentored junior engineers, which sparked transition to full-time training career
+
+COURSE AUTHORSHIP
+--------------------------------------------------------------------
+* Author: "AZ-400 DevOps Deep Dive" — self-published on Pluralsight (32,000 learners)
+* Contributing author: Microsoft Official Curriculum (MOC) AZ-104 lab update 2023
+* Technical reviewer: "Azure Architecture Patterns" (O'Reilly, 2024)
+
+EDUCATION
+--------------------------------------------------------------------
+BS Computer Science, University of Washington, 2015
+
+================================================================================

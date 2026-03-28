@@ -1,0 +1,58 @@
+================================================================================
+CAROL OKONKWO, MSc — AZURE DATA & AI TRAINER
+carol.okonkwo@outlook.com | (312) 555-0374 | Chicago, IL
+LinkedIn: linkedin.com/in/carolokonkwo-trainer
+================================================================================
+
+PROFESSIONAL SUMMARY
+--------------------------------------------------------------------
+Emerging Microsoft technical trainer with 2 years of classroom delivery
+experience and a strong Azure data engineering and AI background. Holds
+relevant Microsoft certifications and brings genuine practitioner depth from
+5 years in production data science roles. Learner satisfaction scores are
+promising but delivery volume is still building. Actively pursuing MCT
+credential (application submitted Q1 2026).
+
+MICROSOFT CERTIFICATIONS
+--------------------------------------------------------------------
+* Azure Data Engineer Associate (DP-203) — Earned 2023
+* Azure AI Engineer Associate (AI-102) — Earned 2024
+* Azure AI Fundamentals (AI-900) — Earned 2022
+* Data Analyst Associate (PL-300) — Earned 2021
+* Azure Fundamentals (AZ-900) — Earned 2021
+
+NOTE: MCT application submitted March 2026 — pending approval
+
+OTHER CERTIFICATIONS
+--------------------------------------------------------------------
+* Databricks Certified Associate Developer for Apache Spark — 2022
+* Google Professional Machine Learning Engineer — 2023
+
+TRAINING DELIVERY EXPERIENCE
+--------------------------------------------------------------------
+Part-Time Technical Instructor — Correlation One (2024 - Present)
+* Deliver Azure AI and data engineering modules for enterprise reskilling cohorts
+* 4.6/5.0 average learner satisfaction across 18 sessions delivered
+* Developed custom lab exercises for Azure Machine Learning and Synapse Analytics
+
+Adjunct Instructor — DePaul University, Chicago IL (2023 - 2024)
+* Taught "Cloud Data Platforms" course to 28 graduate students per semester
+* Integrated hands-on Azure labs into academic curriculum for the first time
+
+INDUSTRY EXPERIENCE
+--------------------------------------------------------------------
+Senior Data Scientist — Acme Financial Services, Chicago IL (2021 - 2024)
+* Developed and deployed Azure ML models; mentored junior data scientists
+* Presented technical findings to non-technical stakeholders — developed strong
+  communication skills that translate directly to training delivery
+
+Data Analyst — Woodgrove Bank, Chicago IL (2019 - 2021)
+* Built Power BI dashboards and delivered internal analytics training sessions
+  for 50+ business analysts — first formal training experience
+
+EDUCATION
+--------------------------------------------------------------------
+MS Data Science, DePaul University, 2019 (GPA: 3.8)
+BS Statistics, University of Lagos, 2016
+
+================================================================================

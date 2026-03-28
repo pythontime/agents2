@@ -1,0 +1,49 @@
+PRIYA KAPOOR
+priya.kapoor@hotmail.com | (206) 555-0342 | Seattle, WA | linkedin.com/in/priyakapoor-ai
+
+--------------------------------------------------------------------------------
+
+PROFESSIONAL SUMMARY
+
+Azure AI specialist with deep expertise in machine learning and cognitive services. 
+Transitioning from engineering into technical education with 1.5 years of bootcamp 
+instruction experience.
+
+--------------------------------------------------------------------------------
+
+MICROSOFT CERTIFICATIONS
+
+* Azure AI Engineer Associate (AI-102) — Earned 2023
+* Azure Data Scientist Associate (DP-100) — Earned 2022
+* Azure Fundamentals (AZ-900) — Earned 2021
+
+OTHER CERTIFICATIONS
+
+* Google Professional Machine Learning Engineer — 2023
+* Deep Learning Specialization (Coursera/deeplearning.ai) — 2022
+
+--------------------------------------------------------------------------------
+
+TRAINING DELIVERY EXPERIENCE
+
+Bootcamp Instructor (Part-time) — Galvanize/Hack Reactor (2023 - Present)
+* Teach Python and ML fundamentals to career-changing cohorts of 15-25 students
+* Developed curriculum for 8-week intro to AI/ML module
+* Student satisfaction rating: 4.6/5.0
+
+--------------------------------------------------------------------------------
+
+PROFESSIONAL EXPERIENCE
+
+Machine Learning Engineer — Microsoft (2021 - Present)
+* Build and deploy ML models for Azure Cognitive Services team
+* Contribute to internal documentation and knowledge base articles
+
+--------------------------------------------------------------------------------
+
+EDUCATION
+
+MS Computer Science (Machine Learning focus), University of Washington, 2021
+BS Mathematics, UCLA, 2019
+
+--------------------------------------------------------------------------------

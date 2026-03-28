@@ -1,0 +1,58 @@
+================================================================================
+BOB MARTINEZ — MICROSOFT 365 TRAINER
+bob.martinez@outlook.com | (512) 555-0293 | Austin, TX
+LinkedIn: linkedin.com/in/bobmartinez-m365
+================================================================================
+
+PROFESSIONAL SUMMARY
+--------------------------------------------------------------------
+Microsoft Certified Trainer (MCT) with 4 years of classroom and virtual
+delivery experience focused on Microsoft 365, Teams administration, and
+endpoint management. Transitioned from IT support into training in 2020 and
+has steadily built a delivery record with positive learner feedback. Looking
+to expand into Azure infrastructure courses with targeted cert investment.
+
+MICROSOFT CERTIFICATIONS
+--------------------------------------------------------------------
+* Microsoft Certified Trainer (MCT) — Active since 2021
+* Microsoft 365 Certified: Enterprise Administrator Expert (MS-102) — 2023
+* Microsoft 365 Certified: Teams Administrator Associate (MS-700) — 2022
+* Microsoft 365 Fundamentals (MS-900) — 2021
+* Azure Fundamentals (AZ-900) — 2022
+
+OTHER CERTIFICATIONS
+--------------------------------------------------------------------
+* CompTIA A+ — 2018
+* CompTIA Network+ — 2019
+
+TRAINING DELIVERY EXPERIENCE
+--------------------------------------------------------------------
+Technical Trainer — New Horizons Learning Centers (2021 - Present)
+* Deliver MS-700, MS-102, and M365 end-user adoption workshops
+* Average 4.5/5.0 learner satisfaction across 85 sessions delivered
+* Developed internal quick-reference labs for Teams Phone and Purview compliance
+* Regularly delivers virtual instructor-led training (VILT) for 15-25 learner cohorts
+
+IT Support Specialist / Trainer — Dell Technologies, Round Rock TX (2018 - 2021)
+* Provided Tier 2 technical support for enterprise hardware and software
+* Developed and delivered internal onboarding training for 200+ new hires annually
+* Recognized as "Trainer of the Quarter" Q3 2020 for new hire satisfaction scores
+
+TECHNICAL DEPTH
+--------------------------------------------------------------------
+* Microsoft 365 administration (Exchange Online, Teams, SharePoint, Purview)
+* Endpoint Manager / Intune device management
+* Azure Active Directory / Entra ID — conditional access, SSPR, MFA
+* PowerShell automation for M365 tenant management
+* Currently studying for AZ-104 (target: Q3 2026)
+
+EDUCATION
+--------------------------------------------------------------------
+AS Information Technology, Austin Community College, 2018
+
+NOTE
+--------------------------------------------------------------------
+Solid M365 trainer with growing Azure exposure. Would benefit from a structured
+mentorship program and support toward AZ-104 to expand delivery scope.
+
+================================================================================

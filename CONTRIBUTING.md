@@ -1,15 +1,15 @@
 # Contributing to agents2
 
-Thank you for your interest in contributing to this O'Reilly Live Learning project! 🎉
+Thank you for your interest in contributing to this O'Reilly Live Learning project!
 
-This repository demonstrates AI agent patterns for educational purposes. We welcome contributions that improve the learning experience.
+This repository demonstrates AI agent patterns for educational purposes. The primary project is `contoso-hr-agent/`, a Contoso HR Agent that screens Microsoft Certified Trainer resumes using LangGraph, CrewAI, and Azure AI Foundry. We welcome contributions that improve the learning experience.
 
-## 🎯 Project Goals
+## Project Goals
 
 This project aims to:
-- Teach AI agent orchestration patterns (LangGraph, CrewAI)
-- Provide working examples for O'Reilly courses
-- Demonstrate production-ready practices
+- Teach AI agent orchestration patterns (LangGraph + CrewAI, fully coupled)
+- Provide a working HR resume screening agent for O'Reilly courses
+- Demonstrate production-ready practices with Azure AI Foundry
 - Remain beginner-friendly and well-documented
 
 ## 🤝 How to Contribute
@@ -27,9 +27,9 @@ This project aims to:
 - Improve error handling
 - Update deprecated dependencies
 
-#### ✨ Features (Please Discuss First)
-- New agent types (Security, Documentation, etc.)
-- Additional LLM providers
+#### Features (Please Discuss First)
+- New CrewAI agent types (beyond PolicyExpert, ResumeAnalyst, DecisionMaker)
+- Additional tool integrations (beyond ChromaDB and Brave Search)
 - New orchestration patterns
 - Teaching aids (diagrams, exercises)
 
@@ -45,24 +45,21 @@ This project aims to:
 ```bash
 # Fork on GitHub, then:
 git clone https://github.com/YOUR-USERNAME/agents2.git
-cd agents2/oreilly-agent-mvp
+cd agents2/contoso-hr-agent
 ```
 
 ### 2. Set Up Environment
 
 ```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/Scripts/activate  # Git Bash/Linux/Mac
-# OR
-.\.venv\Scripts\Activate.ps1   # PowerShell
+# Install uv (if not already installed)
+# See https://docs.astral.sh/uv/getting-started/installation/
 
-# Install dependencies (editable mode)
-pip install -e ".[dev]"
+# Install dependencies
+uv sync
 
 # Configure .env
 cp .env.example .env
-# Add your API keys
+# Add your Azure AI Foundry and Brave Search API keys
 ```
 
 ### 3. Create a Branch
@@ -84,16 +81,22 @@ git checkout -b fix/issue-description
 
 ```bash
 # Run tests
-pytest
+uv run pytest
 
 # Run with coverage
-pytest --cov=agent_mvp
+uv run pytest --cov=contoso_hr_agent
 
-# Test the interactive menu
-agent-menu
+# Run the HR engine (port 8080)
+uv run hr-engine
 
-# Process a mock issue
-agent-mvp mock_issues/issue_001.json
+# Run the folder watcher
+uv run hr-watcher
+
+# Run the MCP server (port 8081)
+uv run hr-mcp
+
+# Seed the knowledge base
+uv run hr-seed
 ```
 
 ### 6. Commit and Push
@@ -173,15 +176,15 @@ def example_function(param: str) -> dict:
 ### Project Structure
 
 ```
-src/agent_mvp/
+contoso-hr-agent/src/contoso_hr_agent/
 ├── __init__.py           # Package metadata only
 ├── models.py             # Pydantic models
 ├── config.py             # Configuration
-├── pipeline/             # Agent orchestration
-│   ├── graph.py         # LangGraph
-│   ├── crew.py          # CrewAI
-│   └── prompts.py       # Prompt templates
-└── integrations/         # External services
+├── pipeline/             # LangGraph + CrewAI orchestration
+├── tools/                # Agent tools (ChromaDB, Brave Search)
+├── knowledge/            # ChromaDB vector store and ingestion
+├── mcp/                  # FastMCP 2 server
+└── watcher/              # Folder watcher for event-driven processing
 ```
 
 **Rules:**
@@ -189,6 +192,8 @@ src/agent_mvp/
 - Keep prompts separate from orchestration
 - Use Pydantic for all data models
 - Avoid deep nesting (max 3 levels)
+- All resumes follow `RESUME_*.txt` naming in `sample_resumes/`
+- Knowledge base documents go in `sample_knowledge/` (`.pdf`, `.docx`, `.pptx`, `.md`)
 
 ### Commit Messages
 
@@ -210,17 +215,17 @@ refactor: simplify error handling in watcher
 - Mock external API calls
 
 ```python
-def test_pm_agent_returns_valid_output():
-    """PM agent should return structured PMOutput."""
+def test_policy_expert_returns_valid_output():
+    """PolicyExpertAgent should return structured evaluation."""
     # Given
-    issue = Issue(title="Test", description="...", ...)
+    resume_text = "Sample resume content..."
 
     # When
-    result = pm_node({"issue": issue.model_dump()})
+    result = policy_expert_node({"resume": resume_text})
 
     # Then
-    assert "pm_output" in result
-    assert PMOutput(**result["pm_output"])  # Validates schema
+    assert "policy_evaluation" in result
+    assert result["policy_evaluation"]["compliant"] is not None
 ```
 
 ## 📖 Documentation Guidelines
@@ -281,14 +286,14 @@ pm_data = _extract_json(response.content)
 
 ### Questions?
 
-- **Documentation:** Check `oreilly-agent-mvp/README.md` first
+- **Documentation:** Check `contoso-hr-agent/README.md` first
 - **Issues:** [Search existing issues](https://github.com/timothywarner-org/agents2/issues)
 - **Discussion:** [Open a discussion](https://github.com/timothywarner-org/agents2/discussions)
 - **Email:** tim@techtrainertim.com (for complex questions)
 
 ### Stuck on Setup?
 
-See [Troubleshooting Guide](oreilly-agent-mvp/README.md#troubleshooting)
+See [Troubleshooting Guide](contoso-hr-agent/README.md#troubleshooting)
 
 ## 🏆 Recognition
 

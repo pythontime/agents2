@@ -8,9 +8,9 @@ Before asking for help, check these resources:
 
 ### Quick Links
 - **[Main README](README.md)** - Course outline and prerequisites
-- **[Technical README](oreilly-agent-mvp/README.md)** - Setup and architecture
+- **[Technical README](contoso-hr-agent/README.md)** - Setup and architecture
 - **[Teaching Guides](docs/)** - Hour-by-hour instructions
-- **[Troubleshooting](oreilly-agent-mvp/README.md#troubleshooting)** - Common issues and fixes
+- **[Troubleshooting](contoso-hr-agent/README.md#troubleshooting)** - Common issues and fixes
 
 ### Video Tutorials
 - Check [TechTrainerTim.com](https://TechTrainerTim.com) for video walkthroughs
@@ -65,15 +65,16 @@ If applicable
 ### For Setup/Installation Issues
 
 **Check:**
-- [Setup instructions](oreilly-agent-mvp/README.md#quick-start-before-class)
-- [Troubleshooting section](oreilly-agent-mvp/README.md#troubleshooting)
-- [Environment configuration](oreilly-agent-mvp/README.md#configuration)
+- [Setup instructions](contoso-hr-agent/README.md#quick-start-before-class)
+- [Troubleshooting section](contoso-hr-agent/README.md#troubleshooting)
+- [Environment configuration](contoso-hr-agent/README.md#configuration)
 
 **Common Issues:**
 - Python version too old: Requires 3.11+
-- API keys not working: Check `.env` format
-- Import errors: Activate venv first
-- Permission denied: Try `chmod +x scripts/*.sh`
+- API keys not working: Check `.env` format (Azure AI Foundry, Brave Search)
+- Missing `uv`: Install from https://docs.astral.sh/uv/getting-started/installation/
+- Import errors: Run commands with `uv run` to use the managed environment
+- ChromaDB issues: Re-seed with `uv run hr-seed`
 
 **Still stuck?** [Open a discussion](https://github.com/timothywarner-org/agents2/discussions)
 
@@ -82,9 +83,9 @@ If applicable
 ### For Usage Questions
 
 **Example questions:**
-- "How do I add a custom agent?"
-- "Can I use a different LLM provider?"
-- "How do I fetch issues from my own repo?"
+- "How do I add a new CrewAI agent to the pipeline?"
+- "Can I use a different LLM provider instead of Azure AI Foundry?"
+- "How do I add custom knowledge documents for resume screening?"
 
 **Best place:** [GitHub Discussions](https://github.com/timothywarner-org/agents2/discussions)
 
@@ -249,4 +250,4 @@ Instructor, O'Reilly Live Learning
 tim@techtrainertim.com
 [TechTrainerTim.com](https://TechTrainerTim.com)
 
-*Last updated: January 2026*
+*Last updated: March 2026*

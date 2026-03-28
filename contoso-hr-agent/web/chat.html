@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contoso HR Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ---- Chat panel ---- */
+    .chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-right: 1px solid var(--border);
+      min-width: 0;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .msg { display: flex; gap: 10px; align-items: flex-start; max-width: 80%; }
+    .msg.user { flex-direction: row-reverse; align-self: flex-end; }
+    .msg-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--contoso-blue); color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; flex-shrink: 0;
+    }
+    .msg.user .msg-avatar { background: var(--contoso-gray-dark); }
+    .msg-bubble {
+      background: var(--contoso-blue-light);
+      border-radius: 12px 12px 12px 4px;
+      padding: 10px 14px; font-size: 14px; line-height: 1.6;
+    }
+    .msg.user .msg-bubble {
+      background: var(--contoso-blue); color: white;
+      border-radius: 12px 12px 4px 12px;
+    }
+    .msg-time { font-size: 11px; color: var(--contoso-gray-dark); margin-top: 4px; }
+
+    .suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 24px 12px; }
+    .suggestion-btn {
+      background: var(--contoso-blue-light); color: var(--contoso-blue);
+      border: 1px solid #BDDFF5; padding: 6px 12px; border-radius: 16px;
+      font-size: 13px; cursor: pointer; transition: all 0.15s;
+    }
+    .suggestion-btn:hover { background: var(--contoso-blue); color: white; }
+
+    .chat-input-bar {
+      padding: 12px 24px 16px; border-top: 1px solid var(--border);
+      display: flex; gap: 10px; align-items: flex-end;
+    }
+    .chat-input {
+      flex: 1; resize: none; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 14px;
+      font-family: inherit; font-size: 14px; outline: none;
+      min-height: 44px; max-height: 120px; transition: border-color 0.15s;
+    }
+    .chat-input:focus { border-color: var(--contoso-blue); }
+
+    /* Session clear link — subtle, below input */
+    .session-actions {
+      padding: 4px 24px 10px;
+      display: flex; gap: 16px;
+    }
+    .session-action-btn {
+      background: none; border: none; padding: 0;
+      font-size: 11px; color: var(--contoso-gray-dark);
+      cursor: pointer; text-decoration: underline;
+      transition: color 0.15s;
+    }
+    .session-action-btn:hover { color: var(--contoso-blue); }
+
+    /* ---- Upload panel ---- */
+    .upload-panel {
+      width: 290px; flex-shrink: 0;
+      background: white;
+      display: flex; flex-direction: column;
+    }
+    .upload-header {
+      padding: 20px 20px 14px; border-bottom: 1px solid var(--border);
+    }
+    .upload-header h2 { font-size: 15px; font-weight: 600; }
+    .upload-header p { font-size: 12px; color: var(--contoso-gray-dark); margin-top: 4px; }
+    .drop-zone {
+      margin: 16px 20px 0;
+      border: 2px dashed var(--contoso-blue); border-radius: var(--radius);
+      padding: 28px 16px; text-align: center; cursor: pointer;
+      transition: all 0.2s; background: var(--contoso-blue-light);
+    }
+    .drop-zone:hover, .drop-zone.drag-over { background: #DCEEFB; border-color: var(--contoso-blue-dark); }
+    .drop-zone .icon { font-size: 32px; margin-bottom: 8px; display: block; }
+    .drop-zone p { font-size: 13px; color: var(--contoso-blue-dark); font-weight: 500; }
+    .drop-zone small { font-size: 11px; color: var(--contoso-gray-dark); }
+    #file-input { display: none; }
+
+    .upload-status {
+      margin: 10px 20px 0; padding: 10px 12px;
+      border-radius: var(--radius); font-size: 13px; display: none;
+    }
+    .upload-status.success { background: #DFF6DD; color: var(--contoso-green); display: block; }
+    .upload-status.error   { background: #FDE7E9; color: var(--contoso-red); display: block; }
+    .upload-status.loading { background: var(--contoso-blue-light); color: var(--contoso-blue); display: flex; align-items: center; gap: 8px; }
+
+    .recent-uploads { padding: 12px 20px 0; }
+    .recent-uploads h3 { font-size: 11px; font-weight: 600; color: var(--contoso-gray-dark); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .upload-item { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+    .upload-item:last-child { border-bottom: none; }
+
+    /* ---- Panel footer with candidates button ---- */
+    .panel-footer {
+      margin-top: auto;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .candidates-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 10px;
+      background: var(--contoso-blue); color: white;
+      border-radius: var(--radius); text-decoration: none;
+      font-size: 13px; font-weight: 600; transition: background 0.15s;
+      border: none; cursor: pointer;
+    }
+    .candidates-btn:hover { background: var(--contoso-blue-dark); }
+    .session-id-display {
+      text-align: center;
+      font-size: 10px;
+      color: var(--contoso-gray-dark);
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-logo">Contoso</div>
+    <div class="header-sub">HR Agent</div>
+    <nav class="header-nav">
+      <a href="chat.html" class="active">Chat</a>
+      <a href="candidates.html">Candidates</a>
+    </nav>
+  </header>
+
+  <div class="main">
+    <!-- ── Chat Panel ── -->
+    <div class="chat-panel">
+      <div class="chat-messages" id="messages">
+        <div class="msg bot">
+          <div class="msg-avatar">HR</div>
+          <div>
+            <div class="msg-bubble">
+              👋 Hi! I'm the <strong>Contoso HR Assistant</strong>.<br><br>
+              I help evaluate <strong>technical trainer candidates</strong> for Azure, M365, and Security courses.<br><br>
+              I can:<br>
+              • <strong>Evaluate resumes</strong> — upload a trainer CV using the panel →<br>
+              • <strong>Answer HR policy questions</strong> (qualifications, compensation, EEO)<br>
+              • <strong>Explain evaluation results</strong> on the Candidates page<br><br>
+              What can I help you with today?
+            </div>
+            <div class="msg-time" id="welcome-time"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="suggestions" id="suggestions">
+        <button class="suggestion-btn" onclick="sendSuggestion(this)">Is MCT required for trainer roles?</button>
+        <button class="suggestion-btn" onclick="sendSuggestion(this)">What Azure certs does Contoso value?</button>
+        <button class="suggestion-btn" onclick="sendSuggestion(this)">How does the evaluation pipeline work?</button>
+      </div>
+
+      <div class="chat-input-bar">
+        <textarea
+          class="chat-input"
+          id="chat-input"
+          placeholder="Ask about HR policy or the hiring process..."
+          rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+        <button class="btn btn-primary" id="send-btn" onclick="sendMessage()">Send</button>
+      </div>
+
+      <div class="session-actions">
+        <button class="session-action-btn" onclick="confirmClearHistory()">Clear chat history</button>
+        <span style="font-size:11px;color:var(--contoso-gray-dark)">Session: <span id="session-id-label" style="font-family:monospace"></span></span>
+      </div>
+    </div>
+
+    <!-- ── Upload Panel ── -->
+    <div class="upload-panel">
+      <div class="upload-header">
+        <h2>📄 Resume Evaluation</h2>
+        <p>Upload a resume to trigger AI-powered screening</p>
+      </div>
+
+      <div
+        class="drop-zone"
+        id="drop-zone"
+        onclick="document.getElementById('file-input').click()"
+        ondragover="handleDragOver(event)"
+        ondragleave="handleDragLeave(event)"
+        ondrop="handleDrop(event)"
+      >
+        <span class="icon">📂</span>
+        <p>Drop resume here<br>or click to browse</p>
+        <small>Supports .txt, .md, .pdf, .docx</small>
+      </div>
+      <input type="file" id="file-input" accept=".txt,.md,.pdf,.docx" onchange="handleFileSelect(event)">
+
+      <div class="upload-status" id="upload-status"></div>
+
+      <div class="recent-uploads" id="recent-uploads-section" style="display:none">
+        <h3>Recent Uploads</h3>
+        <div id="recent-uploads-list"></div>
+      </div>
+
+      <!-- ── Panel footer: Candidates button ── -->
+      <div class="panel-footer">
+        <a href="candidates.html" class="candidates-btn">
+          📋 View Candidate Reports
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="chat.js"></script>
+  <script>
+    // Show session ID label
+    document.getElementById('session-id-label').textContent = sessionId;
+
+    function confirmClearHistory() {
+      if (confirm('Clear chat history and start a new session?')) {
+        clearHistory();
+        location.reload();
+      }
+    }
+  </script>
+</body>
+</html>

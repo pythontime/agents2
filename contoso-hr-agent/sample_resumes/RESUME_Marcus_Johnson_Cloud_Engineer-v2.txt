@@ -1,0 +1,39 @@
+MARCUS JOHNSON
+marcus.johnson@gmail.com | (512) 555-0283 | Austin, TX | linkedin.com/in/marcusjohnson-cloud
+
+--------------------------------------------------------------------------------
+
+PROFESSIONAL SUMMARY
+
+Cloud infrastructure engineer with 5 years designing and managing multi-cloud 
+environments. Expertise in AWS, GCP, and Terraform. Looking to transition into 
+a training-focused role.
+
+--------------------------------------------------------------------------------
+
+CERTIFICATIONS
+
+* AWS Solutions Architect Associate — 2021
+* CompTIA Cloud+ — 2020
+* HashiCorp Terraform Associate — 2022
+
+--------------------------------------------------------------------------------
+
+PROFESSIONAL EXPERIENCE
+
+Senior Cloud Engineer — Rackspace Technology (2021 - Present)
+* Design and implement multi-cloud architectures for enterprise clients
+* Manage infrastructure for 50+ production workloads across AWS and GCP
+* Lead migration projects moving on-premises workloads to cloud
+
+Cloud Infrastructure Engineer — DigitalOcean (2019 - 2021)
+* Built and maintained Kubernetes clusters serving 10M+ requests daily
+* Automated infrastructure provisioning using Terraform and Ansible
+
+--------------------------------------------------------------------------------
+
+EDUCATION
+
+BS Computer Science, University of Texas at Austin, 2019
+
+--------------------------------------------------------------------------------
