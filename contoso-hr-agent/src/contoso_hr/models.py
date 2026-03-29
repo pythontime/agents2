@@ -105,7 +105,7 @@ class CandidateEval(BaseModel):
 class HRDecision(BaseModel):
     """Final hiring decision produced by the DecisionMaker agent."""
 
-    decision: Literal["advance", "hold", "reject"]
+    decision: Literal["Strong Match", "Possible Match", "Needs Review", "Not Qualified"]
     reasoning: str
     next_steps: list[str] = Field(default_factory=list)
     policy_compliance_notes: str = ""

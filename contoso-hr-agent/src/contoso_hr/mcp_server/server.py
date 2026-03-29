@@ -91,7 +91,8 @@ async def list_candidates(
 
     Args:
         limit: Maximum number of results to return (default 20).
-        decision_filter: Filter by decision value: 'advance', 'hold', 'reject', or '' for all.
+        decision_filter: Filter by disposition: 'Strong Match', 'Possible Match',
+            'Needs Review', 'Not Qualified', or '' for all.
 
     Returns:
         List of candidate summaries with name, decision, scores, and timestamp.
@@ -233,7 +234,8 @@ def evaluate_resume(resume_text: str, role: str = "") -> str:
         f"- Curriculum development or course authorship experience\n"
         f"- Hands-on technical depth\n\n"
         f"Provide scores (0-100) for skills match and experience, list key strengths "
-        f"and red flags, and recommend advance/hold/reject.\n\n"
+        f"and red flags, and recommend one of: Strong Match, Possible Match, "
+        f"Needs Review, Not Qualified.\n\n"
         f"RESUME:\n{resume_text}"
     )
 

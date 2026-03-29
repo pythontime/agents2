@@ -91,12 +91,14 @@ class HRLogger:
         console.print(f"  [bold]Run ID:[/]    {run_id}")
         console.print(f"  [candidate]Candidate:[/] {candidate_id}")
 
-        if decision == "advance":
-            d = "[success]ADVANCE[/]"
-        elif decision == "reject":
-            d = "[error]REJECT[/]"
+        if decision == "Strong Match":
+            d = "[success]STRONG MATCH[/]"
+        elif decision == "Possible Match":
+            d = "[success]POSSIBLE MATCH[/]"
+        elif decision == "Not Qualified":
+            d = "[error]NOT QUALIFIED[/]"
         else:
-            d = "[warning]HOLD[/]"
+            d = "[warning]NEEDS REVIEW[/]"
         console.print(f"  [bold]Decision:[/] {d}")
 
         if duration is not None:

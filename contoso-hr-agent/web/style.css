@@ -108,10 +108,11 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.badge-advance { background: #DFF6DD; color: var(--contoso-green); }
-.badge-hold    { background: #FFF4CE; color: #7A5C00; }
-.badge-reject  { background: #FDE7E9; color: var(--contoso-red); }
-.badge-unknown { background: var(--contoso-gray); color: var(--contoso-gray-dark); }
+.badge-strong-match   { background: #DFF6DD; color: #0B5910; }
+.badge-possible-match { background: #EFF6FF; color: #1764AA; }
+.badge-needs-review   { background: #FFF4CE; color: #7A5C00; }
+.badge-not-qualified  { background: #FDE7E9; color: var(--contoso-red); }
+.badge-unknown        { background: var(--contoso-gray); color: var(--contoso-gray-dark); }
 
 /* Score bar */
 .score-bar {

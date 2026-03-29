@@ -1,13 +1,15 @@
 """
 CrewAI agent definitions for Contoso HR Agent.
 
-Three agents, each with a distinct HR persona:
-  - PolicyExpertAgent: Knows Contoso HR policy via ChromaDB RAG
-  - ResumeAnalystAgent: Evaluates candidate qualifications (has web search tool)
-  - DecisionMakerAgent: Synthesizes inputs into advance/hold/reject decision
+Four agents covering the full hiring flow for the open MCT position:
+  - ChatConciergeAgent  : Handles interactive chat, answers HR policy Q&A
+  - PolicyExpertAgent   : Assesses policy compliance for each candidate
+  - ResumeAnalystAgent  : Scores candidate fit for the MCT role (has web search tool)
+  - DecisionMakerAgent  : Renders final disposition (Strong Match / Possible Match /
+                          Needs Review / Not Qualified)
 
 Pattern mirrors oreilly-agent-mvp/crew_variant/agents.py:
-  Each agent class has ROLE, GOAL, BACKSTORY, and a create() classmethod.
+  Each class has ROLE, GOAL, BACKSTORY, and a create() classmethod.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from __future__ import annotations
 from crewai import Agent, LLM
 
 from .prompts import (
+    CHAT_CONCIERGE_SYSTEM_PROMPT,
     DECISION_MAKER_SYSTEM_PROMPT,
     POLICY_EXPERT_SYSTEM_PROMPT,
     RESUME_ANALYST_SYSTEM_PROMPT,
@@ -22,19 +25,25 @@ from .prompts import (
 from .tools import get_policy_expert_tools, get_resume_analyst_tools
 
 
-class PolicyExpertAgent:
-    """HR Policy Expert who retrieves and applies Contoso HR policies."""
+class ChatConciergeAgent:
+    """Alex — Contoso HR Chat Concierge for interactive Q&A.
 
-    ROLE = "Contoso HR Policy Expert"
+    Uses the query_hr_policy tool so every policy answer is grounded
+    in ChromaDB-retrieved Contoso documentation, not LLM hallucination.
+    Invoked by engine.py /api/chat instead of a raw LLM call.
+    """
+
+    ROLE = "Contoso HR Chat Concierge"
     GOAL = (
-        "Ensure all hiring decisions comply with Contoso HR policy, EEO requirements, "
-        "and compensation guidelines by retrieving and applying policy documentation."
+        "Help recruiters and hiring managers with the MCT hiring process — "
+        "answer HR policy questions accurately using Contoso documentation, "
+        "guide users through resume submission, and explain evaluation results."
     )
-    BACKSTORY = POLICY_EXPERT_SYSTEM_PROMPT
+    BACKSTORY = CHAT_CONCIERGE_SYSTEM_PROMPT
 
     @classmethod
     def create(cls, llm: LLM) -> Agent:
-        """Create the PolicyExpert agent with policy retrieval tools.
+        """Create the Chat Concierge agent with policy retrieval tool.
 
         Args:
             llm: CrewAI LLM instance (from Config.get_crew_llm()).
@@ -47,6 +56,30 @@ class PolicyExpertAgent:
             goal=cls.GOAL,
             backstory=cls.BACKSTORY,
             llm=llm,
+            tools=get_policy_expert_tools(),  # query_hr_policy (ChromaDB)
+            verbose=False,  # chat responses don't need verbose crew output
+            allow_delegation=False,
+        )
+
+
+class PolicyExpertAgent:
+    """HR Policy Expert who retrieves and applies Contoso HR policies."""
+
+    ROLE = "Contoso HR Policy Expert"
+    GOAL = (
+        "Ensure all MCT hiring decisions comply with Contoso HR policy, EEO requirements, "
+        "and compensation guidelines by retrieving and applying policy documentation."
+    )
+    BACKSTORY = POLICY_EXPERT_SYSTEM_PROMPT
+
+    @classmethod
+    def create(cls, llm: LLM) -> Agent:
+        """Create the PolicyExpert agent with policy retrieval tool."""
+        return Agent(
+            role=cls.ROLE,
+            goal=cls.GOAL,
+            backstory=cls.BACKSTORY,
+            llm=llm,
             tools=get_policy_expert_tools(),
             verbose=True,
             allow_delegation=False,
@@ -54,25 +87,19 @@ class PolicyExpertAgent:
 
 
 class ResumeAnalystAgent:
-    """Senior Technical Recruiter who evaluates candidate qualifications."""
+    """Senior Talent Acquisition Specialist who evaluates MCT candidate qualifications."""
 
-    ROLE = "Senior Technical Recruiter"
+    ROLE = "Senior Talent Acquisition Specialist"
     GOAL = (
-        "Objectively evaluate candidates' technical skills, experience depth, and career trajectory "
-        "using resume content and web research. Provide scored, evidence-based assessments."
+        "Objectively evaluate candidates' MCT credentials, cert stack, delivery track record, "
+        "and technical depth for the open Microsoft Certified Trainer position at Contoso. "
+        "Provide scored, evidence-based assessments."
     )
     BACKSTORY = RESUME_ANALYST_SYSTEM_PROMPT
 
     @classmethod
     def create(cls, llm: LLM) -> Agent:
-        """Create the ResumeAnalyst agent with web search tool.
-
-        Args:
-            llm: CrewAI LLM instance.
-
-        Returns:
-            Configured CrewAI Agent.
-        """
+        """Create the ResumeAnalyst agent with web search tool."""
         return Agent(
             role=cls.ROLE,
             goal=cls.GOAL,
@@ -85,25 +112,19 @@ class ResumeAnalystAgent:
 
 
 class DecisionMakerAgent:
-    """Hiring Committee Chair who makes the final advance/hold/reject decision."""
+    """Hiring Committee Chair who renders the final MCT screening disposition."""
 
     ROLE = "Hiring Committee Chair"
     GOAL = (
-        "Synthesize HR policy compliance assessment and candidate evaluation into a clear, "
-        "justified hiring decision (advance/hold/reject) with concrete next steps."
+        "Synthesize the HR policy assessment and candidate evaluation into a clear "
+        "screening disposition for the MCT position: "
+        "Strong Match, Possible Match, Needs Review, or Not Qualified."
     )
     BACKSTORY = DECISION_MAKER_SYSTEM_PROMPT
 
     @classmethod
     def create(cls, llm: LLM) -> Agent:
-        """Create the DecisionMaker agent (no external tools — pure reasoning).
-
-        Args:
-            llm: CrewAI LLM instance.
-
-        Returns:
-            Configured CrewAI Agent.
-        """
+        """Create the DecisionMaker agent (no external tools — pure reasoning)."""
         return Agent(
             role=cls.ROLE,
             goal=cls.GOAL,

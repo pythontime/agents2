@@ -1,25 +1,59 @@
 // Contoso HR Agent — Candidates Grid
+// Dispositions: Strong Match | Possible Match | Needs Review | Not Qualified
 
 const API_BASE = '';
 let currentFilter = 'all';
 let allCandidates = [];
 let refreshTimer = null;
 
-// Load on init
-loadCandidates();
-loadStats();
-startAutoRefresh();
+// ---------------------------------------------------------------------------
+// Disposition helpers
+// ---------------------------------------------------------------------------
+
+function dispositionBadgeClass(decision) {
+  switch (decision) {
+    case 'Strong Match':   return 'badge-strong-match';
+    case 'Possible Match': return 'badge-possible-match';
+    case 'Needs Review':   return 'badge-needs-review';
+    case 'Not Qualified':  return 'badge-not-qualified';
+    default:               return 'badge-unknown';
+  }
+}
+
+function dispositionIcon(decision) {
+  switch (decision) {
+    case 'Strong Match':   return '✅';
+    case 'Possible Match': return '🔵';
+    case 'Needs Review':   return '⏸️';
+    case 'Not Qualified':  return '❌';
+    default:               return '❓';
+  }
+}
+
+function dispositionModalClass(decision) {
+  switch (decision) {
+    case 'Strong Match':   return 'advance';   // green banner
+    case 'Possible Match': return 'possible';  // blue banner
+    case 'Needs Review':   return 'hold';      // yellow banner
+    case 'Not Qualified':  return 'reject';    // red banner
+    default:               return 'hold';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Data Loading
 // ---------------------------------------------------------------------------
+
+loadCandidates();
+loadStats();
+startAutoRefresh();
 
 async function loadCandidates() {
   showRefreshing(true);
   try {
     const url = currentFilter === 'all'
       ? `${API_BASE}/api/candidates?limit=50`
-      : `${API_BASE}/api/candidates?limit=50&decision=${currentFilter}`;
+      : `${API_BASE}/api/candidates?limit=50&decision=${encodeURIComponent(currentFilter)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     allCandidates = await res.json();
@@ -38,11 +72,13 @@ async function loadStats() {
     const res = await fetch(`${API_BASE}/api/stats`);
     if (!res.ok) return;
     const data = await res.json();
-    document.getElementById('stat-total').textContent = data.total_evaluations || 0;
-    document.getElementById('stat-advance').textContent = data.by_decision?.advance || 0;
-    document.getElementById('stat-hold').textContent = data.by_decision?.hold || 0;
-    document.getElementById('stat-reject').textContent = data.by_decision?.reject || 0;
-    document.getElementById('stat-score').textContent =
+    const by = data.by_decision || {};
+    document.getElementById('stat-total').textContent   = data.total_evaluations || 0;
+    document.getElementById('stat-strong').textContent  = by['Strong Match']   || 0;
+    document.getElementById('stat-possible').textContent= by['Possible Match'] || 0;
+    document.getElementById('stat-review').textContent  = by['Needs Review']   || 0;
+    document.getElementById('stat-nq').textContent      = by['Not Qualified']  || 0;
+    document.getElementById('stat-score').textContent   =
       data.average_score ? Math.round(data.average_score) : '–';
   } catch (err) {
     console.error('Stats error:', err);
@@ -76,6 +112,7 @@ function renderGrid(candidates) {
 
   grid.innerHTML = candidates.map(c => {
     const scoreClass = c.overall_score >= 70 ? 'high' : c.overall_score >= 40 ? 'med' : 'low';
+    const badgeClass = dispositionBadgeClass(c.decision);
     return `
       <div class="card candidate-card" onclick="openDetail('${c.candidate_id}')">
         <div class="top">
@@ -83,11 +120,11 @@ function renderGrid(candidates) {
             <div class="candidate-name">${escapeHtml(c.candidate_name || 'Unknown')}</div>
             <div class="candidate-file">📄 ${escapeHtml(c.filename)}</div>
           </div>
-          <div class="badge badge-${c.decision}">${c.decision}</div>
+          <div class="badge ${badgeClass}">${escapeHtml(c.decision)}</div>
         </div>
         <div class="candidate-scores">
           <div class="score-row">
-            <span class="score-label">Overall</span>
+            <span class="score-label">Score</span>
             <div class="score-bar"><div class="score-fill ${scoreClass}" style="width:${c.overall_score}%"></div></div>
             <span class="score-num">${c.overall_score}</span>
           </div>
@@ -116,7 +153,6 @@ function showGridError() {
 async function openDetail(candidateId) {
   const backdrop = document.getElementById('modal-backdrop');
   const body = document.getElementById('modal-body');
-
   backdrop.style.display = 'flex';
   body.innerHTML = '<div style="text-align:center;padding:32px"><div class="spinner"></div></div>';
 
@@ -134,21 +170,24 @@ function renderModal(data) {
   const e = data.candidate_eval;
   const d = data.hr_decision;
   const decision = d.decision;
+  const modalClass = dispositionModalClass(decision);
+  const icon = dispositionIcon(decision);
+  const badgeClass = dispositionBadgeClass(decision);
 
   document.getElementById('modal-name').textContent = data.candidate_name || 'Unknown Candidate';
   document.getElementById('modal-file').textContent = `📄 ${data.filename}  |  ID: ${data.candidate_id}`;
 
   const skillClass = e.skills_match_score >= 70 ? 'high' : e.skills_match_score >= 40 ? 'med' : 'low';
-  const expClass = e.experience_score >= 70 ? 'high' : e.experience_score >= 40 ? 'med' : 'low';
+  const expClass   = e.experience_score   >= 70 ? 'high' : e.experience_score   >= 40 ? 'med' : 'low';
 
-  const strengthsHtml = (e.strengths || []).map(s => `<li>${escapeHtml(s)}</li>`).join('') || '<li>None noted</li>';
-  const flagsHtml = (e.red_flags || []).map(f => `<li class="red">${escapeHtml(f)}</li>`).join('') || '<li>None</li>';
-  const nextStepsHtml = (d.next_steps || []).map(s => `<li>${escapeHtml(s)}</li>`).join('') || '<li>See HR</li>';
+  const strengthsHtml = (e.strengths  || []).map(s => `<li>${escapeHtml(s)}</li>`).join('') || '<li>None noted</li>';
+  const flagsHtml     = (e.red_flags  || []).map(f => `<li class="red">${escapeHtml(f)}</li>`).join('') || '<li>None</li>';
+  const nextHtml      = (d.next_steps || []).map(s => `<li>${escapeHtml(s)}</li>`).join('') || '<li>See HR</li>';
 
   document.getElementById('modal-body').innerHTML = `
-    <div class="decision-banner ${decision}">
-      ${decision === 'advance' ? '✅' : decision === 'hold' ? '⏸️' : '❌'}
-      Decision: ${decision.toUpperCase()}  |  Score: ${d.overall_score}/100
+    <div class="decision-banner ${modalClass}">
+      ${icon} Disposition: <span class="badge ${badgeClass}" style="font-size:14px">${escapeHtml(decision)}</span>
+      &nbsp;|&nbsp; Score: ${d.overall_score}/100
     </div>
 
     <div class="detail-section">
@@ -156,14 +195,14 @@ function renderModal(data) {
       <div class="detail-grid">
         <div class="detail-metric">
           <div class="dm-value" style="color:${skillClass==='high'?'var(--contoso-green)':skillClass==='med'?'#7A5C00':'var(--contoso-red)'}">${e.skills_match_score}</div>
-          <div class="dm-label">Skills Match</div>
+          <div class="dm-label">MCT / Cert Skills</div>
           <div class="score-bar" style="width:100%;margin-top:6px">
             <div class="score-fill ${skillClass}" style="width:${e.skills_match_score}%"></div>
           </div>
         </div>
         <div class="detail-metric">
           <div class="dm-value" style="color:${expClass==='high'?'var(--contoso-green)':expClass==='med'?'#7A5C00':'var(--contoso-red)'}">${e.experience_score}</div>
-          <div class="dm-label">Experience Depth</div>
+          <div class="dm-label">Delivery Experience</div>
           <div class="score-bar" style="width:100%;margin-top:6px">
             <div class="score-fill ${expClass}" style="width:${e.experience_score}%"></div>
           </div>
@@ -172,7 +211,7 @@ function renderModal(data) {
     </div>
 
     <div class="detail-section">
-      <div class="section-title">Decision Reasoning</div>
+      <div class="section-title">Disposition Reasoning</div>
       <div class="reasoning-box">${escapeHtml(d.reasoning)}</div>
     </div>
 
@@ -193,9 +232,15 @@ function renderModal(data) {
       <p style="font-size:13px">${escapeHtml(e.culture_fit_notes)}</p>
     </div>` : ''}
 
+    ${e.recommended_role ? `
+    <div class="detail-section">
+      <div class="section-title">Recommended Role</div>
+      <p style="font-size:13px;font-weight:600">${escapeHtml(e.recommended_role)}</p>
+    </div>` : ''}
+
     <div class="detail-section">
       <div class="section-title">Next Steps</div>
-      <ul class="list-items">${nextStepsHtml}</ul>
+      <ul class="list-items">${nextHtml}</ul>
     </div>
 
     ${d.policy_compliance_notes ? `
@@ -217,10 +262,7 @@ function closeModal(e) {
   }
 }
 
-// Keyboard: Escape to close
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 // ---------------------------------------------------------------------------
 // Filters & UI Helpers
@@ -245,10 +287,8 @@ function updateRefreshLabel() {
 
 function escapeHtml(str) {
   return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function formatDateTime(iso) {

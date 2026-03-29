@@ -35,9 +35,10 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
-    .stat-card.advance .value { color: var(--contoso-green); }
-    .stat-card.hold .value    { color: #7A5C00; }
-    .stat-card.reject .value  { color: var(--contoso-red); }
+    .stat-card.strong   .value { color: var(--contoso-green); }
+    .stat-card.possible .value { color: var(--contoso-blue); }
+    .stat-card.review   .value { color: #7A5C00; }
+    .stat-card.nq       .value { color: var(--contoso-red); }
 
     /* Filter bar */
     .filter-bar {
@@ -114,9 +115,10 @@
       font-weight: 600;
       font-size: 15px;
     }
-    .decision-banner.advance { background: #DFF6DD; color: var(--contoso-green); }
-    .decision-banner.hold    { background: #FFF4CE; color: #7A5C00; }
-    .decision-banner.reject  { background: #FDE7E9; color: var(--contoso-red); }
+    .decision-banner.advance  { background: #DFF6DD; color: var(--contoso-green); }
+    .decision-banner.possible { background: #EFF6FF; color: #1764AA; }
+    .decision-banner.hold     { background: #FFF4CE; color: #7A5C00; }
+    .decision-banner.reject   { background: #FDE7E9; color: var(--contoso-red); }
 
     .list-items { list-style: none; }
     .list-items li { padding: 4px 0; padding-left: 16px; position: relative; font-size: 13px; }
@@ -148,18 +150,20 @@
     <!-- Stats Bar -->
     <div class="stats-bar" id="stats-bar">
       <div class="card stat-card"><div class="value" id="stat-total">–</div><div class="label">Total Evaluated</div></div>
-      <div class="card stat-card advance"><div class="value" id="stat-advance">–</div><div class="label">Advance</div></div>
-      <div class="card stat-card hold"><div class="value" id="stat-hold">–</div><div class="label">Hold</div></div>
-      <div class="card stat-card reject"><div class="value" id="stat-reject">–</div><div class="label">Reject</div></div>
+      <div class="card stat-card strong"><div class="value" id="stat-strong">–</div><div class="label">Strong Match</div></div>
+      <div class="card stat-card possible"><div class="value" id="stat-possible">–</div><div class="label">Possible Match</div></div>
+      <div class="card stat-card review"><div class="value" id="stat-review">–</div><div class="label">Needs Review</div></div>
+      <div class="card stat-card nq"><div class="value" id="stat-nq">–</div><div class="label">Not Qualified</div></div>
       <div class="card stat-card"><div class="value" id="stat-score">–</div><div class="label">Avg Score</div></div>
     </div>
 
     <!-- Filter Bar -->
     <div class="filter-bar">
       <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
-      <button class="filter-btn" data-filter="advance" onclick="setFilter('advance', this)">Advance</button>
-      <button class="filter-btn" data-filter="hold" onclick="setFilter('hold', this)">Hold</button>
-      <button class="filter-btn" data-filter="reject" onclick="setFilter('reject', this)">Reject</button>
+      <button class="filter-btn" data-filter="Strong Match"   onclick="setFilter('Strong Match', this)">Strong Match</button>
+      <button class="filter-btn" data-filter="Possible Match" onclick="setFilter('Possible Match', this)">Possible Match</button>
+      <button class="filter-btn" data-filter="Needs Review"   onclick="setFilter('Needs Review', this)">Needs Review</button>
+      <button class="filter-btn" data-filter="Not Qualified"  onclick="setFilter('Not Qualified', this)">Not Qualified</button>
       <div class="refresh-info">
         <div class="spinner" id="refresh-spinner" style="display:none"></div>
         <span id="refresh-label">Auto-refreshes every 10s</span>

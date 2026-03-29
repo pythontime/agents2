@@ -222,7 +222,7 @@ def resume_analyst_crew_node(state: HRState) -> HRState:
 
 
 def decision_maker_crew_node(state: HRState) -> HRState:
-    """DecisionMaker agent renders the final advance/hold/reject decision.
+    """DecisionMaker agent renders the final MCT screening disposition.
 
     Node 4: Single CrewAI Crew with DecisionMakerAgent (no external tools).
     Pure reasoning over prior agent outputs.
@@ -259,15 +259,15 @@ def decision_maker_crew_node(state: HRState) -> HRState:
                 candidate_eval.skills_match_score + candidate_eval.experience_score
             ) // 2
             raw_data = {
-                "decision": "hold",
+                "decision": "Needs Review",
                 "reasoning": str(result.raw)[:400],
-                "next_steps": ["Manual review required"],
-                "policy_compliance_notes": "Automated decision failed; manual review needed",
+                "next_steps": ["Manual review required — automated decision parsing failed"],
+                "policy_compliance_notes": "Automated disposition failed; manual review needed",
                 "overall_score": avg_score,
             }
 
         hr_decision = HRDecision(
-            decision=raw_data.get("decision", "hold"),
+            decision=raw_data.get("decision", "Needs Review"),
             reasoning=raw_data.get("reasoning", ""),
             next_steps=raw_data.get("next_steps", []),
             policy_compliance_notes=raw_data.get("policy_compliance_notes", ""),
@@ -305,9 +305,9 @@ def notify_node(state: HRState) -> HRState:
                 "strengths": [], "recommended_role": None, "web_research_notes": "",
             },
             "hr_decision": {
-                "decision": "hold",
+                "decision": "Needs Review",
                 "reasoning": f"Pipeline error: {state['error']}",
-                "next_steps": ["Manual review required"],
+                "next_steps": ["Manual review required — pipeline did not complete"],
                 "policy_compliance_notes": "",
                 "overall_score": 0,
             },

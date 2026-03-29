@@ -94,25 +94,6 @@ def _save_session(session_id: str, history: list[dict]) -> None:
     except Exception:
         pass  # non-fatal — memory still works in-process
 
-HR_SYSTEM_PROMPT = """You are the Contoso HR Assistant, an AI-powered chatbot that helps
-recruiters and hiring managers evaluate technical trainer candidates and answer HR policy questions.
-
-Contoso hires technical trainers for Microsoft Azure, M365, and Security certification courses.
-Key hiring criteria you understand: MCT (Microsoft Certified Trainer) status, Azure/M365/Security
-certifications (AZ-104, AZ-305, AZ-400, SC-300, SC-200, AI-102, etc.), training delivery
-volume and learner satisfaction scores, curriculum development experience.
-
-You can:
-1. Answer questions about Contoso HR policy (trainer qualifications, compensation bands, EEO, benefits)
-2. Accept resume uploads for AI-powered trainer evaluation (use the upload panel)
-3. Explain what the AI pipeline looks for: policy compliance → technical skills → delivery track record → decision
-4. Interpret evaluation results from the Candidates dashboard
-
-When a user wants to submit a resume, guide them to the file upload panel (right side).
-Uploaded resumes trigger the full 3-agent evaluation pipeline automatically.
-
-Be professional, helpful, and concise. Base policy answers on Contoso's documented HR policies."""
-
 
 # ---------------------------------------------------------------------------
 # API Routes
@@ -121,10 +102,11 @@ Be professional, helpful, and concise. Base policy answers on Contoso's document
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(message: ChatMessage) -> ChatResponse:
-    """Handle a chat message and return an AI response.
+    """Handle a chat message via the ChatConcierge CrewAI agent.
 
-    Uses Azure AI Foundry (AzureChatOpenAI) for response generation.
-    Maintains per-session conversation history.
+    The concierge uses the query_hr_policy tool so policy answers are
+    grounded in ChromaDB-retrieved Contoso documentation. Conversation
+    history is included in the task prompt for context continuity.
     """
     logger = get_hr_logger()
     config = get_config()
@@ -133,29 +115,51 @@ async def chat(message: ChatMessage) -> ChatResponse:
     history = _load_session(message.session_id)
     history.append({"role": "user", "content": message.message})
 
-    # Send last 20 turns to the LLM to stay well within context limits
-    recent_history = history[-20:]
+    # Build a compact transcript of recent turns to give the agent context
+    recent = history[-20:]
+    transcript_lines = []
+    for turn in recent[:-1]:  # exclude current message — it's the task
+        role_label = "User" if turn["role"] == "user" else "Alex (you)"
+        transcript_lines.append(f"{role_label}: {turn['content'][:300]}")
+    transcript = "\n".join(transcript_lines) if transcript_lines else "(new conversation)"
 
     try:
-        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+        from crewai import Crew, Process, Task
+        from contoso_hr.pipeline.agents import ChatConciergeAgent
 
-        llm = config.get_llm()
-        lc_messages = [SystemMessage(content=HR_SYSTEM_PROMPT)]
-        for turn in recent_history[:-1]:  # last item is the current user message
-            if turn["role"] == "user":
-                lc_messages.append(HumanMessage(content=turn["content"]))
-            else:
-                lc_messages.append(AIMessage(content=turn["content"]))
-        lc_messages.append(HumanMessage(content=message.message))
+        llm = config.get_crew_llm()
+        agent = ChatConciergeAgent.create(llm)
 
-        response = await asyncio.to_thread(llm.invoke, lc_messages)
-        reply = response.content
+        task = Task(
+            description=f"""Respond to the user's message as Alex, the Contoso HR Chat Concierge.
+
+CONVERSATION SO FAR:
+{transcript}
+
+USER'S CURRENT MESSAGE:
+{message.message}
+
+Use query_hr_policy for any policy question. Keep the response concise and conversational.
+Do not repeat the conversation history in your reply — just answer the current message.""",
+            expected_output="A helpful, concise conversational reply to the user's message.",
+            agent=agent,
+        )
+
+        crew = Crew(
+            agents=[agent],
+            tasks=[task],
+            process=Process.sequential,
+            verbose=False,
+        )
+
+        result = await asyncio.to_thread(crew.kickoff)
+        reply = result.raw.strip()
 
     except Exception as e:
-        logger.error(f"Chat LLM error: {e}", e)
+        logger.error(f"Chat concierge error: {e}", e)
         reply = (
-            "I'm sorry, I encountered an error processing your request. "
-            "Please check that Azure AI Foundry is configured correctly."
+            "I'm sorry, I encountered an error. "
+            "Please check that Azure AI Foundry is configured and the knowledge base is seeded."
         )
 
     history.append({"role": "assistant", "content": reply})
@@ -163,7 +167,6 @@ async def chat(message: ChatMessage) -> ChatResponse:
     # Persist to disk so context survives server restarts
     _save_session(message.session_id, history)
 
-    # Generate context-aware suggestions
     suggestions = _get_suggestions(message.message)
 
     return ChatResponse(
@@ -327,8 +330,8 @@ def _get_suggestions(user_message: str) -> list[str]:
         return ["What is the trainer interview process?", "What does the technical screen involve?"]
     if any(w in msg_lower for w in ["resume", "cv", "upload", "candidate"]):
         return ["How do I submit a resume?", "What makes a strong trainer resume?"]
-    if any(w in msg_lower for w in ["score", "decision", "advance", "reject", "hold"]):
-        return ["What score threshold means advance?", "What does 'hold' mean for a candidate?"]
+    if any(w in msg_lower for w in ["score", "decision", "match", "qualified", "review", "disposition"]):
+        return ["What does 'Strong Match' mean?", "When does a candidate get 'Needs Review'?"]
     return [
         "What certifications does Contoso require for trainers?",
         "How do I submit a resume for evaluation?",
