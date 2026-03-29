@@ -22,7 +22,8 @@
       "Bash(pip show:*)",
       "mcp__github__issue_write",
       "Bash(npx --version:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(uv venv:*)"
     ]
   }
 }

@@ -1,166 +1,86 @@
-# MCP Server Quick Reference
+# MCP Server Quick Reference -- Contoso HR Agent
 
-## Installation
+**Last Updated:** 2026-03-29
 
-```bash
-pip install mcp>=1.0.0
-pip install -e .
-```
-
-## Quick Launch (PowerShell 7) ⚡
-
-**Main menu (all options):**
-```powershell
-.\launch.ps1
-```
-
-**Direct launchers:**
-```powershell
-.\mcp.ps1        # MCP server
-.\inspector.ps1  # MCP Inspector (web UI)
-```
+> **Historical note:** This file previously documented the `oreilly-agent-mvp/` MCP server.
+> All content below targets `contoso-hr-agent/` with FastMCP 2 over SSE.
 
 ## Start Server
 
 ```bash
-agent-mcp                          # CLI command
-python -m agent_mvp.mcp_server     # Direct Python
-./scripts/run_mcp.sh               # Bash script
-.\scripts\run_mcp.ps1              # PowerShell script
+cd contoso-hr-agent
+uv run hr-mcp              # FastMCP 2 SSE on port 8081
 ```
 
-## Test Server
+The server force-kills port 8081 on startup and listens at `http://localhost:8081/sse`.
+
+## Test with MCP Inspector
 
 ```bash
-# Option 1: Validation test
-python tests/test_mcp_server.py
-
-# Option 2: MCP Inspector (web UI - requires Node.js)
-./scripts/run_mcp_inspector.sh     # Bash
-.\scripts\run_mcp_inspector.ps1    # PowerShell
+# Requires Node.js
+npx @modelcontextprotocol/inspector http://localhost:8081/sse
 ```
 
-## Available Tools (5)
+Opens a web UI (typically `http://localhost:5173`) to browse and call tools interactively.
 
-| Tool | Description | Example Usage |
-|------|-------------|---------------|
-| `fetch_github_issue` | Fetch issue from GitHub | "Fetch issue #42" |
-| `list_mock_issues` | List test issues | "What mock issues exist?" |
-| `load_mock_issue` | Load specific mock issue | "Load issue_001.json" |
-| `run_agent_pipeline` | Run PM→Dev→QA pipeline | "Run pipeline on this issue" |
-| `process_issue_file` | Process JSON file | "Process incoming/issue.json" |
+## Tools (4)
 
-## Available Resources (4)
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `get_candidate` | `candidate_id` | Full evaluation result for one candidate |
+| `list_candidates` | `limit`, `decision_filter` | Recent evaluations, optionally filtered |
+| `trigger_resume_evaluation` | `resume_text`, `filename` | Run the full pipeline synchronously |
+| `query_policy` | `question` | Semantic search against ChromaDB |
+
+## Resources (4)
 
 | Resource URI | Description |
 |--------------|-------------|
-| `config://settings` | App configuration |
-| `issues://mock/{filename}` | Mock issue content |
-| `pipeline://schema` | Pydantic schemas |
-| `pipeline://architecture` | Pipeline docs |
+| `schema://candidate` | JSON schema for `EvaluationResult` |
+| `stats://evaluations` | Aggregate evaluation statistics |
+| `samples://resumes` | List of sample resume files |
+| `config://settings` | Current app config (no secrets) |
 
-## Available Prompts (3)
+## Prompts (2)
 
-| Prompt | Parameters | Usage |
-|--------|------------|-------|
-| `analyze_github_issue` | `issue_url`, `focus` | Structured issue analysis |
-| `review_implementation_plan` | `issue_title`, `implementation_plan`, `criteria` | QA review with standards |
-| `generate_test_issue` | `issue_type`, `complexity`, `domain` | Create test data |
+| Prompt | Description |
+|--------|-------------|
+| `evaluate_resume` | Structured resume evaluation prompt |
+| `policy_query` | HR policy question prompt |
 
-## Claude Desktop Setup
+## Ports
 
-1. **Edit config** (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`)
-2. **Add server:**
-   ```json
-   {
-     "mcpServers": {
-       "oreilly-agent-mvp": {
-         "command": "python",
-         "args": ["-m", "agent_mvp.mcp_server"],
-         "cwd": "YOUR_PROJECT_PATH",
-         "env": {
-           "PYTHONPATH": "YOUR_PROJECT_PATH/src"
-         }
-       }
-     }
-   }
-   ```
-3. **Restart Claude**
-4. **Look for 🔌 icon**
+| Service | Port | Command |
+|---------|------|---------|
+| FastAPI Engine | 8080 | `uv run hr-engine` |
+| FastMCP 2 SSE | 8081 | `uv run hr-mcp` |
 
-## VS Code Setup
+Engine prints all 4 URIs on startup: Web UI, API, Docs, MCP SSE.
 
-1. **Config already in** `.vscode/mcp.json`
-2. **Reload window:** Ctrl+Shift+P → "Developer: Reload Window"
-3. **Test in Copilot:** "@workspace List mock issues"
+## File Locations
 
-## Common Commands (In Claude/Copilot)
-
-```
-List available mock issues
-Fetch issue #123 from timothywarner-org/agents2
-Run the agent pipeline on this issue
-Load issue_001.json and process it
-Show me the pipeline architecture
-What's in the config?
-Analyze https://github.com/org/repo/issues/5 with security focus
-Review this implementation plan with strict criteria
+```text
+contoso-hr-agent/
+  src/contoso_hr/mcp_server/
+    __init__.py
+    __main__.py
+    server.py            # FastMCP 2 server implementation
+  scripts/
+    start_mcp.sh         # Starts MCP server + Inspector
+    start_mcp.ps1        # Windows variant
 ```
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| `ModuleNotFoundError: No module named 'mcp'` | `pip install mcp>=1.0.0` |
-| `agent-mcp: command not found` | `pip install -e .` |
-| No 🔌 in Claude | Check config path, restart Claude |
-| VS Code doesn't see tools | Reload window, check Output panel |
-| Tools fail with auth errors | Check `.env` has LLM credentials |
-
-## File Locations
-
-```
-oreilly-agent-mvp/
-├── src/agent_mvp/mcp_server/
-│   ├── server.py              # Main server implementation
-│   └── README.md              # Full documentation
-├── .mcp/
-│   └── claude_desktop_config.json  # Claude config template
-├── .vscode/
-│   └── mcp.json               # VS Code config (ready to use)
-├── scripts/
-│   ├── run_mcp.sh             # Bash launcher
-│   ├── run_mcp.ps1            # PowerShell launcher
-│   ├── run_mcp_inspector.sh   # Inspector launcher (Bash)
-│   └── run_mcp_inspector.ps1  # Inspector launcher (PowerShell)
-├── tests/
-│   └── test_mcp_server.py     # Validation test
-├── MCP_SETUP.md               # Step-by-step setup guide
-├── MCP_INSPECTOR_GUIDE.md     # Inspector usage guide
-├── MCP_IMPLEMENTATION_SUMMARY.md  # Implementation details
-└── MCP_QUICK_REF.md           # This file
-```
+| Port 8081 in use | Server force-kills port on startup; restart with `uv run hr-mcp` |
+| Inspector cannot connect | Verify `http://localhost:8081/sse` is reachable |
+| Tools fail with auth errors | Check `.env` has Azure AI Foundry credentials |
+| ChromaDB queries return nothing | Run `uv run hr-seed` to populate the vector store |
 
 ## Documentation
 
-- **Setup Guide:** `MCP_SETUP.md`
-- **Full API Docs:** `src/agent_mvp/mcp_server/README.md`
-- **Inspector Guide:** `MCP_INSPECTOR_GUIDE.md`
-- **Implementation Summary:** `MCP_IMPLEMENTATION_SUMMARY.md`
-- **Main README:** `README.md` (MCP section)
-
-## Support
-
-- **GitHub Issues:** [agents2/issues](https://github.com/timothywarner-org/agents2/issues)
-- **Email:** tim@techtrainertim.com
-- **Website:** [TechTrainerTim.com](https://TechTrainerTim.com)
-
----
-
-**Quick Start:**
-1. `./scripts/run_mcp_inspector.sh`  (opens browser)
-3. Test all tools interactively!
-4. Configure Claude Desktop (see `MCP_SETUP.md`)e)
-4. Test: "List available mock issues"
-
-**Version:** 0.1.0 | **Date:** January 2026
+- [MCP_SETUP.md](MCP_SETUP.md) -- step-by-step setup
+- [MCP_INSPECTOR_GUIDE.md](MCP_INSPECTOR_GUIDE.md) -- Inspector usage
+- [MCP_IMPLEMENTATION_SUMMARY.md](MCP_IMPLEMENTATION_SUMMARY.md) -- implementation details

@@ -33,23 +33,76 @@ function appendToHistory(role, text) {
   saveHistory(history);
 }
 
+// Clear history for the current session only (stays on same session ID).
 function clearHistory() {
   localStorage.removeItem(`hr_history_${sessionId}`);
-  // Generate a fresh session so the server also starts fresh
+  fetch(`${API_BASE}/api/chat/history/${sessionId}`, { method: 'DELETE' }).catch(() => {});
+}
+
+// Start a brand-new blank session without touching the current one.
+function newSession() {
   sessionId = generateId();
   localStorage.setItem('hr_session_id', sessionId);
+
+  // Reset the message pane — keep only the static welcome message (first child)
+  const container = document.getElementById('messages');
+  while (container.children.length > 1) {
+    container.removeChild(container.lastChild);
+  }
+
+  // Restore default suggestions
+  document.getElementById('suggestions').innerHTML = `
+    <button class="suggestion-btn" onclick="sendSuggestion(this)">Is MCT required for trainer roles?</button>
+    <button class="suggestion-btn" onclick="sendSuggestion(this)">What Azure certs does Contoso value?</button>
+    <button class="suggestion-btn" onclick="sendSuggestion(this)">How does the evaluation pipeline work?</button>
+    <button class="suggestion-btn" onclick="sendSuggestion(this)">What makes a Strong Match candidate?</button>
+    <button class="suggestion-btn" onclick="sendSuggestion(this)">How do I submit a resume for evaluation?</button>
+    <button class="suggestion-btn" onclick="sendSuggestion(this)">What is Contoso's EEO policy?</button>
+  `;
+
+  // Update session label and refresh past sessions list
+  const label = document.getElementById('session-id-label');
+  if (label) label.textContent = sessionId;
+  loadPastSessions();
+}
+
+// Switch to a previously saved session.
+function switchSession(id) {
+  sessionId = id;
+  localStorage.setItem('hr_session_id', id);
+  location.reload();
 }
 
 // ---------------------------------------------------------------------------
 // Restore previous session on page load
+// Falls back to server-side JSON if localStorage has no history for this id.
 // ---------------------------------------------------------------------------
 
-function restoreSession() {
-  const history = loadHistory();
+async function restoreSession() {
+  let history = loadHistory();
+
+  // If localStorage is empty, try fetching from the server (covers the case
+  // where the user switched sessions or cleared localStorage manually).
+  if (!history.length) {
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/history/${sessionId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.history && data.history.length) {
+          history = data.history.map(m => ({
+            role: m.role === 'assistant' ? 'bot' : m.role,
+            text: m.content,
+            time: new Date().toISOString(),
+          }));
+          saveHistory(history);
+        }
+      }
+    } catch { /* server unavailable — stay blank */ }
+  }
+
   if (!history.length) return;
 
   const container = document.getElementById('messages');
-  // Insert a subtle divider before restored messages
   const divider = document.createElement('div');
   divider.style.cssText = 'text-align:center;font-size:11px;color:var(--contoso-gray-dark);padding:8px 0 4px;';
   divider.textContent = '— previous session restored —';
@@ -59,6 +112,55 @@ function restoreSession() {
     renderMessage(role, text, new Date(time));
   });
   container.scrollTop = container.scrollHeight;
+}
+
+// ---------------------------------------------------------------------------
+// Past sessions panel
+// ---------------------------------------------------------------------------
+
+async function loadPastSessions() {
+  const list = document.getElementById('past-sessions-list');
+  const section = document.getElementById('past-sessions-section');
+  if (!list || !section) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/chat/sessions`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const sessions = (data.sessions || []).filter(s => s.message_count > 0);
+
+    if (!sessions.length) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+    list.innerHTML = sessions.map(s => {
+      const isActive = s.session_id === sessionId;
+      const preview = s.last_message_preview || '(no messages)';
+      const timeLabel = formatRelativeTime(s.last_updated * 1000);
+      return `
+        <div class="session-item ${isActive ? 'active' : ''}" onclick="${isActive ? '' : `switchSession('${s.session_id}')`}" title="${escapeHtml(preview)}">
+          <div class="session-item-preview">${escapeHtml(preview.length > 40 ? preview.slice(0, 40) + '…' : preview)}</div>
+          <div class="session-item-meta">
+            <span>${s.message_count} msgs</span>
+            <span>${timeLabel}</span>
+          </div>
+          ${isActive ? '<span class="session-item-badge">current</span>' : ''}
+        </div>
+      `;
+    }).join('');
+  } catch { /* server unavailable */ }
+}
+
+function formatRelativeTime(ms) {
+  const diff = Date.now() - ms;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 // ---------------------------------------------------------------------------
@@ -295,4 +397,4 @@ function generateId() {
 // ---------------------------------------------------------------------------
 
 document.getElementById('welcome-time').textContent = formatTime(new Date());
-restoreSession();
+restoreSession().then(() => loadPastSessions());

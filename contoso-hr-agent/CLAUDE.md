@@ -44,22 +44,28 @@ Knowledge docs in `sample_knowledge/` include PDFs, .docx, .pptx, and .md files.
 
 ## Architecture
 
-### Pipeline Flow (5 LangGraph nodes)
+### Pipeline Flow (5 LangGraph nodes, parallel fan-out)
 
-```
+```text
 Resume file (.txt, .md, .pdf, .docx -- drop or web upload)
     |
 LangGraph StateGraph  (pipeline/graph.py, SqliteSaver checkpoints)
-  [intake]          -> validate ResumeSubmission
-  [policy_expert]   -> CrewAI Crew: PolicyExpertAgent + query_hr_policy tool (ChromaDB)
-  [resume_analyst]  -> CrewAI Crew: ResumeAnalystAgent + brave_web_search tool
+  [intake]                    -> validate ResumeSubmission
+      |           |
+  [policy_expert] [resume_analyst]   <- PARALLEL fan-out (run concurrently)
+  ChromaDB lookup  Brave web search
+      |           |
+      +-----+-----+
+            |
   [decision_maker]  -> CrewAI Crew: DecisionMakerAgent (pure reasoning, no tools)
   [notify]          -> assemble EvaluationResult, log Rich summary
     |
 data/outgoing/{candidate_id}_{ts}.json  +  data/hr.db  +  data/checkpoints.db  +  data/chat_sessions/{session_id}.json
 ```
 
-**CrewAI + LangGraph coupling:** Each `*_crew_node` creates a `Crew(agents=[one_agent], tasks=[one_task], process=Process.sequential)` and calls `crew.kickoff()`. LangGraph owns routing/state/persistence; CrewAI owns persona execution. This pattern is from `oreilly-agent-mvp/src/agent_mvp/pipeline/crew_variant/graph.py`.
+**Parallel pattern:** `policy_expert` and `resume_analyst` are independent -- one queries ChromaDB, the other does web research. LangGraph fans out from `intake` to both, then fans in at `decision_maker` which waits for both to complete before rendering the final disposition. Parallel nodes return ONLY their own state keys (not `{**state, ...}`) so LangGraph can safely merge the two partial updates. `create_resume_analyst_task` accepts `Optional[PolicyContext]` and falls back to standard policy text when running in parallel without prior policy context.
+
+**CrewAI + LangGraph coupling:** Each `*_crew_node` creates a `Crew(agents=[one_agent], tasks=[one_task], process=Process.sequential)` and calls `crew.kickoff()`. LangGraph owns routing/state/persistence; CrewAI owns persona execution.
 
 ### Four Agents
 
@@ -86,18 +92,19 @@ These are enforced as a `Literal` type in `HRDecision.decision` in `models.py`.
 ### Diagrams
 
 See `README.md` for four Mermaid diagrams:
-- **Diagram A** (Agent Roster) -- flowchart showing all four agents with tools and invocation context
-- **Diagram B** (Evaluation Pipeline) -- sequenceDiagram of full file-drop-to-result flow
-- **Diagram C** (Data Model Chain) -- flowchart of Pydantic model progression with ChromaDB/SQLite
-- **Diagram D** (Chat Memory Architecture) -- flowchart of two-layer chat persistence
+
+- **Diagram A** (Agent Roster) -- flowchart showing all four agents with parallel fan-out grouping for PolicyExpert and ResumeAnalyst
+- **Diagram B** (Evaluation Pipeline) -- sequenceDiagram with `par` block showing policy_expert and resume_analyst firing concurrently, then fan-in at decision_maker
+- **Diagram C** (Data Model Chain) -- flowchart of Pydantic model progression showing parallel branches from ResumeSubmission to both PolicyContext and CandidateEval
+- **Diagram D** (Chat Memory Architecture) -- flowchart of two-layer chat persistence with Past Sessions sidebar, cross-session context injection, and `/api/chat/sessions` endpoint
 
 ### Key Files
 
 | Path | Purpose |
 |------|---------|
-| `src/contoso_hr/pipeline/graph.py` | LangGraph StateGraph, HRState TypedDict, all 5 node functions, `create_hr_graph()` |
+| `src/contoso_hr/pipeline/graph.py` | LangGraph StateGraph with parallel fan-out edges, HRState TypedDict, all 5 node functions, `create_hr_graph()`. Parallel nodes return partial state only. |
 | `src/contoso_hr/pipeline/agents.py` | ChatConciergeAgent, PolicyExpertAgent, ResumeAnalystAgent, DecisionMakerAgent (CrewAI) |
-| `src/contoso_hr/pipeline/tasks.py` | CrewAI Task factories (inject prior state into task descriptions) |
+| `src/contoso_hr/pipeline/tasks.py` | CrewAI Task factories (inject prior state into task descriptions). `create_resume_analyst_task` accepts `Optional[PolicyContext]` for parallel execution. |
 | `src/contoso_hr/pipeline/tools.py` | `@tool query_hr_policy` (ChromaDB) + `@tool brave_web_search` (Brave API) |
 | `src/contoso_hr/pipeline/prompts.py` | System prompts for all 4 agents (persona, evaluation criteria, output format) |
 | `src/contoso_hr/config.py` | Config dataclass, Azure AI Foundry LLM/embeddings factory |
@@ -106,15 +113,18 @@ See `README.md` for four Mermaid diagrams:
 | `src/contoso_hr/knowledge/retriever.py` | `query_policy_knowledge(question, k)` -> PolicyContext |
 | `src/contoso_hr/memory/sqlite_store.py` | HRSQLiteStore: candidates + evaluations tables |
 | `src/contoso_hr/memory/checkpoints.py` | `get_checkpointer()`, `make_thread_config(session_id)` |
-| `src/contoso_hr/engine.py` | FastAPI: /api/chat, /api/upload, /api/candidates, /api/stats, /api/health, GET/DELETE /api/chat/history/{id} |
+| `src/contoso_hr/engine.py` | FastAPI: /api/chat, /api/chat/sessions, /api/upload, /api/candidates, /api/stats, /api/health, GET/DELETE /api/chat/history/{id}. Prints 4 URIs on startup (Web UI, API, Docs, MCP SSE). Builds past-session context (last 6 turns from last 2 sessions) for ChatConcierge. |
 | `src/contoso_hr/watcher/resume_watcher.py` | Polls data/incoming/ for .txt/.md/.pdf/.docx files every 3s |
 | `src/contoso_hr/watcher/process_resume.py` | Runs LangGraph pipeline and saves result to SQLite |
 | `src/contoso_hr/mcp_server/server.py` | FastMCP 2 server (SSE, port 8081) |
 | `src/contoso_hr/util/port_utils.py` | `force_kill_port(port)` -- called on every startup |
+| `web/chat.html` / `web/chat.js` | Chat UI with upload, 6 suggestion buttons, new-chat/clear-history buttons, past sessions sidebar |
+| `web/candidates.html` / `web/candidates.js` | Candidate results grid with auto-refresh |
+| `web/runs.html` / `web/runs.js` | Pipeline Trace viewer: split-panel, left=run list, right=visual trace with parallel branches side-by-side |
 
 ### Data Model Chain
 
-```
+```text
 ResumeSubmission (input)
   -> PolicyContext     (ChromaDB retrieval result)
   -> CandidateEval     (skills_match_score, experience_score, strengths, red_flags)
@@ -137,10 +147,17 @@ Azure deployment: resource `contoso-hr-ai` in resource group `contoso-hr-rg` (ea
 ### Chat History Persistence
 
 Two-layer pattern for chat memory:
+
 - **Client-side:** `localStorage` in the browser -- instant restore on page reload, no server round-trip.
 - **Server-side:** JSON files in `data/chat_sessions/{session_id}.json` -- survives browser clears, accessible via API.
+- **Cross-session context:** The last 6 turns from the last 2 past sessions are injected into the ChatConcierge task prompt for continuity across conversations.
+
+Session management endpoints:
+
+- `GET /api/chat/sessions` lists all session JSON files with message count, preview, and timestamp.
 - `GET /api/chat/history/{session_id}` returns the persisted history; `DELETE` clears it.
-- The Candidates page has a "Back to Chat" link; the Chat page has a "Candidates" button.
+
+Chat UI features: "New chat" button (resets UI in-place, new session ID, no reload), "Clear history" button (wipes current session only), Past Sessions panel in right sidebar (fetches `/api/chat/sessions`, click to switch). Six suggestion buttons on initial load. Nav bar across all 3 pages: Chat | Candidates | Pipeline Runs.
 
 ### MCP Server (FastMCP 2)
 

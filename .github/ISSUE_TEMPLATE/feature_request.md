@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an improvement or new feature
+about: Suggest an improvement or new feature for the Contoso HR Agent
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''
@@ -19,18 +19,31 @@ assignees: ''
 
 **How would it work?**
 
+**Which component would change?**
+
+- [ ] Pipeline (LangGraph / CrewAI agents)
+- [ ] Chat Concierge (Alex)
+- [ ] Web UI (chat.html / candidates.html / runs.html)
+- [ ] MCP Server (FastMCP 2)
+- [ ] Knowledge Base (ChromaDB)
+- [ ] New agent or tool
+- [ ] Documentation / Teaching Guides
+- [ ] Other:
+
 **Example usage:**
+
 ```python
 # Show how someone would use this feature
 ```
 
 ## Educational Value
-<!-- How does this help learners? -->
+<!-- How does this help learners in the O'Reilly course? -->
 
 - [ ] Makes setup easier
-- [ ] Clarifies a complex concept
+- [ ] Clarifies a complex concept (e.g., parallel pipeline, MCP, RAG)
 - [ ] Adds practical examples
 - [ ] Improves teaching materials
+- [ ] Demonstrates a new agent pattern
 - [ ] Other:
 
 ## Alternatives Considered
@@ -53,10 +66,13 @@ assignees: ''
 **Possible approach:**
 
 **Files that would need changes:**
+<!-- Reference files in contoso-hr-agent/src/contoso_hr/ -->
+
 -
 -
 
 **Complexity estimate:**
+
 - [ ] Simple (< 1 hour)
 - [ ] Medium (1-4 hours)
 - [ ] Complex (> 4 hours)

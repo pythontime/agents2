@@ -4,6 +4,8 @@
 
 **Time:** 60 minutes
 
+**Active Project:** `contoso-hr-agent/` (the Contoso HR Agent for MCT resume screening)
+
 ---
 
 ## Opening (5 minutes)
@@ -53,11 +55,11 @@ A: "I don't have access          A: *Checks calendar*
 **Show the ReAct Loop:**
 
 ```
-┌─────────────────────────────────────────┐
-│                                         │
-│   Observe → Think → Act → Observe...   │
-│                                         │
-└─────────────────────────────────────────┘
++-----------------------------------------+
+|                                         |
+|   Observe -> Think -> Act -> Observe... |
+|                                         |
++-----------------------------------------+
 ```
 
 **Break it down:**
@@ -125,10 +127,10 @@ npm install -g @anthropic-ai/claude-code
 
 ### Demo: Claude Code in Action (7 minutes)
 
-**Open terminal in the agents2 repo:**
+**Open terminal in the contoso-hr-agent project:**
 
 ```bash
-cd agents2/oreilly-agent-mvp
+cd agents2/contoso-hr-agent
 claude
 ```
 
@@ -136,17 +138,17 @@ claude
 
 1. **Exploration:**
    ```
-   What files handle the PM agent? Give me a quick overview.
+   What files handle the HR pipeline? Give me a quick overview.
    ```
 
 2. **Code understanding:**
    ```
-   Explain how token tracking works in this project.
+   Explain how the parallel pipeline works -- how do policy_expert and resume_analyst run concurrently?
    ```
 
 3. **Making changes:**
    ```
-   Add a docstring to the pm_node function explaining what it does.
+   Add a docstring to the intake node function explaining what it does.
    ```
 
 **Point out:** "Watch Claude's tool use -- it reads files, searches, then edits. That's the agent loop."
@@ -157,7 +159,7 @@ claude
 
 1. Start Claude Code in the project:
    ```bash
-   cd agents2/oreilly-agent-mvp
+   cd agents2/contoso-hr-agent
    claude
    ```
 
@@ -168,7 +170,7 @@ claude
 
 3. Ask Claude to explain:
    ```
-   How does the pipeline flow from issue input to final result?
+   How does the pipeline flow from resume submission to final evaluation result?
    ```
 
 4. Ask Claude to find something:
@@ -215,56 +217,56 @@ https://copilotstudio.microsoft.com
 **Walk through creating an agent:**
 
 1. **Create new copilot:**
-   - Click "Create" → "New copilot"
-   - Name: "Issue Triage Assistant"
-   - Description: "Helps categorize GitHub issues"
+   - Click "Create" -> "New copilot"
+   - Name: "HR Resume Screener"
+   - Description: "Helps evaluate candidate resumes against HR policies"
 
 2. **Add a topic:**
-   - Topics → Add topic → From blank
-   - Name: "Categorize Issue"
+   - Topics -> Add topic -> From blank
+   - Name: "Screen Resume"
    - Trigger phrases:
-     - "categorize this issue"
-     - "what type of issue is this"
-     - "help me triage"
+     - "screen this resume"
+     - "evaluate this candidate"
+     - "help me review"
 
 3. **Add conversation flow:**
    - Add node: "Ask a question"
-   - Question: "Paste the issue title and description"
-   - Save response as: `IssueText`
+   - Question: "Paste the candidate resume text"
+   - Save response as: `ResumeText`
 
 4. **Add generative answer:**
    - Add node: "Generative answers"
-   - Configure to use `IssueText` as context
+   - Configure to use `ResumeText` as context
 
 5. **Test in the canvas:**
    - Click "Test" in top right
-   - Try: "Categorize this issue: Users can't login after password reset"
+   - Try: "Screen this resume: 10 years experience in cloud computing, AWS and Azure certified..."
 
-**Point out:** "No code. We built an agent that can reason about issues using drag-and-drop."
+**Point out:** "No code. We built an agent that can reason about resumes using drag-and-drop. Compare this to the code-first approach in contoso-hr-agent."
 
 ### Hands-On Exercise (10 minutes)
 
 **Everyone try:**
 
-1. Create a new copilot named "Code Review Helper"
+1. Create a new copilot named "HR Policy Advisor"
 
 2. Add a topic with triggers:
-   - "review this code"
-   - "check my implementation"
-   - "code review"
+   - "check HR policy"
+   - "what does the policy say"
+   - "policy question"
 
 3. Add a question node:
-   - "Paste the code you'd like me to review"
+   - "What HR policy question do you have?"
 
-4. Add a generative answer that reviews the code
+4. Add a generative answer that responds based on HR context
 
-5. Test with some Python code:
-   ```python
-   def add(a, b):
-       return a + b
+5. Test with a sample question:
+
+   ```text
+   What certifications are required for the MCT role?
    ```
 
-**Challenge:** Add a second topic for "explain this code" that explains code instead of reviewing it.
+**Challenge:** Add a second topic for "evaluate candidate" that evaluates a resume instead of answering policy questions.
 
 ---
 
@@ -307,22 +309,23 @@ https://copilotstudio.microsoft.com
 ### What We Accomplished
 
 - Defined what makes an agent different from a chatbot
-- Understood the Observe → Think → Act loop
-- Used Claude Code to explore and modify a codebase
+- Understood the Observe -> Think -> Act loop
+- Used Claude Code to explore and modify the Contoso HR Agent codebase
 - Built a conversational agent in Copilot Studio
 - Compared code-first vs low-code approaches
 
 ### What's Next (Hour 2)
 
-- Run the full agent pipeline (PM → Dev → QA)
-- Understand the architecture of multi-agent systems
+- Run the full HR agent pipeline with **parallel subagent execution**
+- See the Pipeline Runs page (runs.html) showing live parallel branches
+- Understand the architecture: LangGraph + CrewAI + ChromaDB
 - Debug agent behavior with VSCode
-- See token usage and costs in real-time
+- Chat with the HR concierge agent (Alex) via the web UI
 
 ### Key Takeaways
 
 1. **Agents take actions** -- they don't just respond
-2. **The ReAct loop** is the core pattern (Observe → Think → Act)
+2. **The ReAct loop** is the core pattern (Observe -> Think -> Act)
 3. **Claude Code** is for developers in the terminal
 4. **Copilot Studio** is for business automation with GUI
 5. **Both are valid** -- choose based on your use case
@@ -403,14 +406,17 @@ Action: read_file("Header.tsx")
 ### Tool Use Pattern
 
 ```
-User → Agent → [Tool Call] → Tool Result → Agent → Response
+User -> Agent -> [Tool Call] -> Tool Result -> Agent -> Response
 ```
 
 ### Multi-Agent Pattern (Preview for Hour 2)
 
 ```
-Issue → [PM Agent] → Plan → [Dev Agent] → Code → [QA Agent] → Verdict
+Resume -> [intake] -> [policy_expert || resume_analyst] -> [decision_maker] -> [notify]
+                           (parallel fan-out / fan-in)
 ```
+
+**This is the key demo in Hour 2:** LangGraph fan-out sends the resume to PolicyExpertAgent and ResumeAnalystAgent **concurrently**, then fan-in merges results for DecisionMakerAgent.
 
 ---
 

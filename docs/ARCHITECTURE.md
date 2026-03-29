@@ -1,6 +1,6 @@
 # Contoso HR Agent -- Architecture Deep Dive
 
-**Last Updated:** 2026-03-28
+**Last Updated:** 2026-03-29
 **Project:** `contoso-hr-agent/` within the `agents2` repository
 **Course:** O'Reilly *Build Production AI Agents*
 **Purpose:** Screen Microsoft Certified Trainer (MCT) candidates using a multi-agent AI pipeline
@@ -23,8 +23,8 @@ flowchart LR
 
     subgraph ENGINE["FastAPI Engine :8080"]
         direction TB
-        WEBUI["Web UI<br/>chat.html / candidates.html"]
-        API["REST API<br/>/api/chat  /api/upload<br/>/api/candidates  /api/stats"]
+        WEBUI["Web UI<br/>chat.html / candidates.html / runs.html"]
+        API["REST API<br/>/api/chat  /api/upload  /api/chat/sessions<br/>/api/candidates  /api/stats"]
     end
 
     subgraph PIPELINE_CLUSTER["LangGraph Pipeline"]
@@ -34,7 +34,9 @@ flowchart LR
         N3["resume_analyst"]
         N4["decision_maker"]
         N5["notify"]
-        N1 --> N2 --> N3 --> N4 --> N5
+        N1 --> N2 & N3
+        N2 & N3 --> N4
+        N4 --> N5
     end
 
     subgraph DATA["Data Stores"]
@@ -81,7 +83,7 @@ flowchart LR
 
 **Key points:**
 
-- The FastAPI engine serves both the static web UI and the REST API on port 8080.
+- The FastAPI engine serves the static web UI (chat.html, candidates.html, runs.html) and the REST API on port 8080. On startup it prints all 4 URIs: Web UI, API, Docs, MCP SSE.
 - The file watcher is a separate process that polls `data/incoming/` and feeds resumes into the same LangGraph pipeline.
 - The FastMCP 2 server on port 8081 exposes tools, resources, and prompts for MCP-compatible clients (e.g., MCP Inspector).
 - All LLM and embedding calls route through Azure AI Foundry.
@@ -136,7 +138,8 @@ flowchart TD
         end
         style DM fill:#C08000,color:#FFFFFF,stroke:#C08000
 
-        PE --> RA --> DM
+        PE --> DM
+        RA --> DM
     end
 
     POLICY_AGENT -->|"produces"| PC["PolicyContext<br/>chunks + sources"]
@@ -159,7 +162,7 @@ flowchart TD
 
 ## 3. LangGraph Pipeline
 
-The pipeline is a linear `StateGraph` with five nodes. All state is carried in `HRState` (a `TypedDict`). Each crew node creates a single-agent `Crew`, calls `kickoff()`, parses the JSON output, and merges it back into state.
+The pipeline is a `StateGraph` with five nodes and a parallel fan-out/fan-in pattern. All state is carried in `HRState` (a `TypedDict`). After `intake`, `policy_expert` and `resume_analyst` run **concurrently** (independent fan-out). Both must complete before `decision_maker` (fan-in). Each crew node creates a single-agent `Crew`, calls `kickoff()`, parses the JSON output, and merges it back into state. Parallel nodes return ONLY their own state keys so LangGraph can safely merge the two partial updates.
 
 ### Diagram 3 -- Pipeline State Machine
 
@@ -167,9 +170,17 @@ The pipeline is a linear `StateGraph` with five nodes. All state is carried in `
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#0078D4','primaryTextColor':'#FFFFFF','primaryBorderColor':'#004E8C','lineColor':'#767676','secondaryColor':'#E8E8E8','tertiaryColor':'#F3F2F1'}}}%%
 stateDiagram-v2
     [*] --> intake : ResumeSubmission
-    intake --> policy_expert : validated resume dict
-    policy_expert --> resume_analyst : + PolicyContext, policy_meta
-    resume_analyst --> decision_maker : + CandidateEval
+    intake --> fork_state : validated resume dict
+
+    state fork_state <<fork>>
+    fork_state --> policy_expert
+    fork_state --> resume_analyst
+
+    state join_state <<join>>
+    policy_expert --> join_state : + PolicyContext, policy_meta
+    resume_analyst --> join_state : + CandidateEval
+
+    join_state --> decision_maker
     decision_maker --> notify : + HRDecision
     notify --> [*] : EvaluationResult
 

@@ -9,6 +9,8 @@ Dispositions: Strong Match | Possible Match | Needs Review | Not Qualified
 
 from __future__ import annotations
 
+from typing import Optional
+
 from crewai import Agent, Task
 
 from ..models import CandidateEval, PolicyContext, ResumeSubmission
@@ -54,12 +56,17 @@ Output JSON with these exact keys:
 
 def create_resume_analyst_task(
     submission: ResumeSubmission,
-    policy_context: PolicyContext,
+    policy_context: Optional[PolicyContext],
     agent: Agent,
 ) -> Task:
-    """ResumeAnalyst: score candidate qualifications for the open MCT position."""
+    """ResumeAnalyst: score candidate qualifications for the open MCT position.
+
+    policy_context is optional — this task runs in parallel with policy_expert
+    so policy context may not be available yet. Falls back to standard policy text.
+    """
     policy_summary = (
-        policy_context.chunks[0][:500] if policy_context.chunks
+        policy_context.chunks[0][:500]
+        if policy_context and policy_context.chunks
         else "Standard Contoso MCT trainer policy applies."
     )
 

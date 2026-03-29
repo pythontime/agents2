@@ -4,8 +4,20 @@ LangGraph StateGraph for Contoso HR Agent pipeline.
 Architecture: LangGraph owns WHEN and STATE. CrewAI owns WHO and WHAT.
 Each *_crew_node runs exactly one Crew.kickoff() call.
 
-Graph flow:
-  [intake] → [policy_expert] → [resume_analyst] → [decision_maker] → [notify] → END
+Graph flow (parallel fan-out / fan-in):
+
+  [intake]
+     ├──→ [policy_expert]  ──┐
+     └──→ [resume_analyst] ──┴──→ [decision_maker] → [notify] → END
+
+policy_expert and resume_analyst run concurrently — they are independent:
+  - policy_expert: queries ChromaDB for HR policy compliance
+  - resume_analyst: scores qualifications + optional Brave web research
+Both feed into decision_maker, which waits for both to complete before
+rendering the final disposition.
+
+IMPORTANT: parallel nodes must return ONLY the keys they write, not
+{**state, ...}. LangGraph merges partial updates at the fan-in point.
 
 Checkpointing via SqliteSaver enables cross-run memory per session_id (thread_id).
 """
@@ -99,13 +111,14 @@ def intake_node(state: HRState) -> HRState:
 def policy_expert_crew_node(state: HRState) -> HRState:
     """PolicyExpert agent assesses resume against Contoso HR policy.
 
-    Node 2: Single CrewAI Crew with PolicyExpertAgent + query_hr_policy tool.
+    Parallel branch A: Single CrewAI Crew with PolicyExpertAgent + query_hr_policy tool.
+    Returns only its own keys — LangGraph merges with resume_analyst output at fan-in.
     """
     logger = get_hr_logger()
     logger.node_enter("policy_expert")
 
     if state.get("error"):
-        return state
+        return {}
 
     try:
         submission = ResumeSubmission(**state["resume"])
@@ -134,7 +147,6 @@ def policy_expert_crew_node(state: HRState) -> HRState:
                 "compensation_band": "See HR",
             }
 
-        # Store both the structured context and raw meta
         policy_context = PolicyContext(
             chunks=[raw_data.get("policy_context_summary", "")],
             sources=["policy_expert_crew"],
@@ -142,36 +154,39 @@ def policy_expert_crew_node(state: HRState) -> HRState:
         )
 
         logger.node_exit("policy_expert", raw_data.get("recommended_level", ""))
+        # Return ONLY this node's keys — parallel merge requires partial updates
         return {
-            **state,
             "policy_context": policy_context.model_dump(),
             "policy_meta": raw_data,
         }
 
     except Exception as e:
         logger.error(f"PolicyExpert crew failed: {e}", e)
-        return {**state, "error": f"PolicyExpert crew failed: {e}"}
+        return {"error": f"PolicyExpert crew failed: {e}"}
 
 
 def resume_analyst_crew_node(state: HRState) -> HRState:
     """ResumeAnalyst agent scores the candidate with optional web research.
 
-    Node 3: Single CrewAI Crew with ResumeAnalystAgent + brave_web_search tool.
+    Parallel branch B: Single CrewAI Crew with ResumeAnalystAgent + brave_web_search tool.
+    Runs concurrently with policy_expert — does NOT read policy_context from state
+    (it hasn't been written yet). policy_context is merged in at decision_maker.
+    Returns only its own keys — LangGraph merges with policy_expert output at fan-in.
     """
     logger = get_hr_logger()
     logger.node_enter("resume_analyst")
 
     if state.get("error"):
-        return state
+        return {}
 
     try:
         submission = ResumeSubmission(**state["resume"])
-        policy_context = PolicyContext(**state["policy_context"])
         config = get_config()
         llm = config.get_crew_llm()
 
         agent = ResumeAnalystAgent.create(llm)
-        task = create_resume_analyst_task(submission, policy_context, agent)
+        # policy_context=None — running in parallel, not yet available
+        task = create_resume_analyst_task(submission, None, agent)
 
         logger.agent_message("analyst", "Evaluating candidate qualifications...")
         crew = Crew(
@@ -211,14 +226,12 @@ def resume_analyst_crew_node(state: HRState) -> HRState:
             "resume_analyst",
             f"skills={candidate_eval.skills_match_score} exp={candidate_eval.experience_score}",
         )
-        return {
-            **state,
-            "candidate_eval": candidate_eval.model_dump(),
-        }
+        # Return ONLY this node's keys — parallel merge requires partial updates
+        return {"candidate_eval": candidate_eval.model_dump()}
 
     except Exception as e:
         logger.error(f"ResumeAnalyst crew failed: {e}", e)
-        return {**state, "error": f"ResumeAnalyst crew failed: {e}"}
+        return {"error": f"ResumeAnalyst crew failed: {e}"}
 
 
 def decision_maker_crew_node(state: HRState) -> HRState:
@@ -393,10 +406,15 @@ def create_hr_graph(data_dir: Path):
     builder.add_node("decision_maker", decision_maker_crew_node)
     builder.add_node("notify", notify_node)
 
+    # Fan-out: intake spawns both specialist agents concurrently
     builder.set_entry_point("intake")
     builder.add_edge("intake", "policy_expert")
-    builder.add_edge("policy_expert", "resume_analyst")
+    builder.add_edge("intake", "resume_analyst")
+
+    # Fan-in: decision_maker waits for BOTH branches to complete
+    builder.add_edge("policy_expert", "decision_maker")
     builder.add_edge("resume_analyst", "decision_maker")
+
     builder.add_edge("decision_maker", "notify")
     builder.add_edge("notify", END)
 

@@ -95,6 +95,44 @@ def _save_session(session_id: str, history: list[dict]) -> None:
         pass  # non-fatal — memory still works in-process
 
 
+def _build_past_session_context(current_session_id: str, max_sessions: int = 2, max_turns: int = 6) -> str:
+    """Return a compact excerpt from the most recent past sessions.
+
+    Pulls up to `max_turns` turns from each of the `max_sessions` most
+    recently modified session files, skipping the current session. Each
+    message is truncated to 200 chars to keep the prompt tight.
+    """
+    sessions_dir = _sessions_dir()
+    past_files = sorted(
+        [p for p in sessions_dir.glob("*.json") if p.stem != current_session_id],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )[:max_sessions]
+
+    if not past_files:
+        return ""
+
+    blocks = []
+    for path in past_files:
+        try:
+            history = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not history:
+            continue
+        excerpt_turns = history[-max_turns:]
+        lines = []
+        for turn in excerpt_turns:
+            role_label = "User" if turn.get("role") == "user" else "Alex (you)"
+            lines.append(f"  {role_label}: {turn.get('content', '')[:200]}")
+        blocks.append("\n".join(lines))
+
+    if not blocks:
+        return ""
+
+    return "\n\n---\n".join(blocks)
+
+
 # ---------------------------------------------------------------------------
 # API Routes
 # ---------------------------------------------------------------------------
@@ -123,6 +161,14 @@ async def chat(message: ChatMessage) -> ChatResponse:
         transcript_lines.append(f"{role_label}: {turn['content'][:300]}")
     transcript = "\n".join(transcript_lines) if transcript_lines else "(new conversation)"
 
+    # Pull in excerpts from recent past sessions so the agent can reference
+    # things the user mentioned in previous conversations.
+    past_context = _build_past_session_context(message.session_id)
+    past_context_block = (
+        f"\nPRIOR SESSION CONTEXT (recent past conversations — use only if relevant):\n{past_context}\n"
+        if past_context else ""
+    )
+
     try:
         from crewai import Crew, Process, Task
         from contoso_hr.pipeline.agents import ChatConciergeAgent
@@ -132,8 +178,8 @@ async def chat(message: ChatMessage) -> ChatResponse:
 
         task = Task(
             description=f"""Respond to the user's message as Alex, the Contoso HR Chat Concierge.
-
-CONVERSATION SO FAR:
+{past_context_block}
+CURRENT CONVERSATION:
 {transcript}
 
 USER'S CURRENT MESSAGE:
@@ -249,6 +295,33 @@ async def clear_chat_history(session_id: str) -> dict:
     return {"session_id": session_id, "cleared": True}
 
 
+@app.get("/api/chat/sessions")
+async def list_chat_sessions() -> dict:
+    """List all persisted chat sessions, sorted by most recently updated.
+
+    Returns metadata for each session: id, message count, last user message
+    preview, and last-updated timestamp (Unix seconds).
+    """
+    sessions_dir = _sessions_dir()
+    sessions = []
+    for path in sorted(sessions_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        session_id = path.stem
+        try:
+            history = json.loads(path.read_text(encoding="utf-8"))
+            last_user = next(
+                (m["content"] for m in reversed(history) if m.get("role") == "user"), ""
+            )
+            sessions.append({
+                "session_id": session_id,
+                "message_count": len(history),
+                "last_message_preview": last_user[:80],
+                "last_updated": path.stat().st_mtime,
+            })
+        except Exception:
+            continue
+    return {"sessions": sessions}
+
+
 @app.get("/api/candidates", response_model=list[CandidateSummary])
 async def list_candidates(
     limit: int = 50,
@@ -355,9 +428,11 @@ def main() -> None:
     port = config.engine_port
     force_kill_port(port)
 
+    mcp_port = config.mcp_port
     print(f"\n  Web UI:  http://localhost:{port}/chat.html")
     print(f"  API:     http://localhost:{port}/api/")
-    print(f"  Docs:    http://localhost:{port}/docs\n")
+    print(f"  Docs:    http://localhost:{port}/docs")
+    print(f"  MCP SSE: http://localhost:{mcp_port}/sse\n")
 
     uvicorn.run(
         "contoso_hr.engine:app",

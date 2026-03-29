@@ -1,6 +1,6 @@
 ---
 name: Question
-about: Ask a question about the project
+about: Ask a question about the Contoso HR Agent project
 title: '[QUESTION] '
 labels: question
 assignees: ''
@@ -33,24 +33,41 @@ assignees: ''
 <!-- Help us understand what you've already looked at -->
 
 - [ ] Main README
-- [ ] Technical README (oreilly-agent-mvp/)
-- [ ] Teaching guides (docs/)
-- [ ] Troubleshooting section
+- [ ] contoso-hr-agent/README.md (technical setup and architecture)
+- [ ] CLAUDE.md (full architecture reference)
+- [ ] Teaching guides (docs/hour-*-teaching-guide.md)
+- [ ] Troubleshooting section in contoso-hr-agent/README.md
 - [ ] Existing issues/discussions
 
+## Which Area?
+<!-- What part of the project does your question relate to? -->
+
+- [ ] Setup / Installation
+- [ ] Pipeline (LangGraph / CrewAI)
+- [ ] Chat Concierge (Alex)
+- [ ] MCP Server (FastMCP 2)
+- [ ] Knowledge Base (ChromaDB)
+- [ ] Web UI (chat.html / candidates.html / runs.html)
+- [ ] Azure deployment
+- [ ] Testing
+- [ ] Other:
+
 ## Environment (if relevant)
+
 **OS:**
 **Python version:**
-**LLM provider:**
+**LLM provider:** Azure AI Foundry (default) / Other:
 
 ## Expected Answer
 <!-- What would a good answer look like? -->
 
 **I'm hoping to learn:**
+
 -
 -
 
 **An example or reference would help:**
+
 - [ ] Yes, please include code examples
 - [ ] Just an explanation is fine
 - [ ] A link to documentation is sufficient

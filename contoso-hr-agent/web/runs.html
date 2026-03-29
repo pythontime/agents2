@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pipeline Runs — Contoso HR Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Split layout ── */
+    .runs-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Run list (left panel) ── */
+    .run-list-panel {
+      width: 300px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--contoso-gray);
+    }
+    .run-list-header {
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      background: white;
+    }
+    .run-list-header h2 { font-size: 14px; font-weight: 600; }
+    .run-list-header p  { font-size: 11px; color: var(--contoso-gray-dark); margin-top: 2px; }
+    .run-list-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .run-item {
+      background: white;
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .run-item:hover { border-color: var(--contoso-blue); }
+    .run-item.active {
+      border-color: var(--contoso-blue);
+      background: var(--contoso-blue-light);
+    }
+    .run-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .run-item-name { font-size: 13px; font-weight: 600; flex: 1; }
+    .run-item-file { font-size: 10px; color: var(--contoso-gray-dark); margin-top: 2px; }
+    .run-item-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .run-item-score {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--contoso-blue);
+    }
+    .run-item-time { font-size: 10px; color: var(--contoso-gray-dark); }
+
+    /* ── Trace panel (right) ── */
+    .trace-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+      background: white;
+    }
+    .trace-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--contoso-gray-dark);
+      gap: 8px;
+    }
+    .trace-empty .icon { font-size: 40px; }
+
+    /* ── Trace header ── */
+    .trace-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      gap: 16px;
+    }
+    .trace-title { font-size: 18px; font-weight: 700; }
+    .trace-subtitle { font-size: 12px; color: var(--contoso-gray-dark); margin-top: 3px; }
+    .trace-meta {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .trace-meta-item { text-align: right; }
+    .trace-meta-item .value { font-size: 13px; font-weight: 600; }
+    .trace-meta-item .label { font-size: 10px; color: var(--contoso-gray-dark); }
+
+    /* ── Pipeline diagram ── */
+    .pipeline {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    /* Node cards */
+    .pipeline-node {
+      width: 100%;
+      max-width: 560px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .node-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .node-icon { font-size: 16px; }
+    .node-label { flex: 1; }
+    .node-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .node-body {
+      padding: 12px 16px;
+      background: white;
+      font-size: 13px;
+    }
+
+    /* Node color themes */
+    .node-intake    .node-header { background: #F3F2F1; color: #333; }
+    .node-policy    .node-header { background: #EFF6FF; color: #1764AA; }
+    .node-analyst   .node-header { background: #F0FFF4; color: #107C10; }
+    .node-decision  .node-header { background: #FFF4CE; color: #7A5C00; }
+    .node-notify    .node-header { background: #F3F2F1; color: #333; }
+
+    /* Parallel section wrapper */
+    .parallel-section {
+      width: 100%;
+      max-width: 560px;
+    }
+    .parallel-label {
+      text-align: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--contoso-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 0;
+      background: var(--contoso-blue-light);
+      border-radius: var(--radius) var(--radius) 0 0;
+      border: 1px solid #BDDFF5;
+      border-bottom: none;
+    }
+    .parallel-nodes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid #BDDFF5;
+      border-radius: 0 0 var(--radius) var(--radius);
+      overflow: hidden;
+    }
+    .parallel-nodes .pipeline-node {
+      border-radius: 0;
+      border: none;
+      border-right: 1px solid #BDDFF5;
+      max-width: none;
+    }
+    .parallel-nodes .pipeline-node:last-child { border-right: none; }
+
+    /* Connectors */
+    .connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 24px;
+      position: relative;
+    }
+    .connector::before {
+      content: '';
+      width: 2px;
+      flex: 1;
+      background: var(--border);
+    }
+    .connector-arrow {
+      width: 0; height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid var(--border);
+    }
+
+    /* Inline data rows */
+    .data-row { display: flex; gap: 6px; align-items: baseline; margin-bottom: 5px; }
+    .data-key { font-size: 11px; color: var(--contoso-gray-dark); min-width: 90px; flex-shrink: 0; }
+    .data-val { font-size: 12px; font-weight: 500; }
+    .score-pill {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--contoso-blue-light);
+      color: var(--contoso-blue);
+    }
+    .bullet-list { margin: 4px 0 0; padding: 0; list-style: none; }
+    .bullet-list li { font-size: 12px; padding: 2px 0 2px 14px; position: relative; color: #333; }
+    .bullet-list li::before { content: '•'; position: absolute; left: 0; color: var(--contoso-blue); }
+    .bullet-list li.red::before { color: var(--contoso-red); }
+
+    .decision-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pill-strong   { background: #DFF6DD; color: var(--contoso-green); }
+    .pill-possible { background: #EFF6FF; color: #1764AA; }
+    .pill-review   { background: #FFF4CE; color: #7A5C00; }
+    .pill-nq       { background: #FDE7E9; color: var(--contoso-red); }
+
+    .reasoning-block {
+      margin-top: 8px;
+      background: #FFFBF0;
+      border-left: 3px solid #F5C518;
+      padding: 8px 12px;
+      font-size: 12px;
+      line-height: 1.6;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-logo">Contoso</div>
+    <div class="header-sub">HR Agent</div>
+    <nav class="header-nav">
+      <a href="chat.html">Chat</a>
+      <a href="candidates.html">Candidates</a>
+      <a href="runs.html" class="active">Pipeline Runs</a>
+    </nav>
+  </header>
+
+  <div class="runs-layout">
+    <!-- ── Left: Run List ── -->
+    <div class="run-list-panel">
+      <div class="run-list-header">
+        <h2>Pipeline Runs</h2>
+        <p id="run-count">Auto-refreshes every 10s</p>
+      </div>
+      <div class="run-list-scroll" id="run-list">
+        <div style="padding:24px;text-align:center;color:var(--contoso-gray-dark);font-size:13px">
+          Loading runs...
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Right: Trace View ── -->
+    <div class="trace-panel" id="trace-panel">
+      <div class="trace-empty">
+        <div class="icon">🔬</div>
+        <strong>Select a run to inspect the pipeline trace</strong>
+        <span style="font-size:12px">Drop a resume to kick off the first evaluation</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="runs.js"></script>
+</body>
+</html>

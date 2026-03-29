@@ -1,8 +1,10 @@
-# Hour 2 Teaching Guide: Run, Test, and Debug
+# Hour 2 Teaching Guide: Run, Test, and Debug the Parallel Pipeline
 
-**Goal:** Students run the full agent pipeline, understand how to test it, and master VSCode debugging.
+**Goal:** Students run the full HR agent pipeline, see parallel subagent execution live, understand testing, and master VSCode debugging.
 
 **Time:** 60 minutes
+
+**Active Project:** `contoso-hr-agent/` (the Contoso HR Agent for MCT resume screening)
 
 ---
 
@@ -10,13 +12,13 @@
 
 **What We're Doing This Hour:**
 
-1. Run the complete PM → Dev → QA pipeline
-2. Understand the data flow through the system
-3. Write and run tests
-4. Master VSCode debugging with breakpoints
-5. Inspect state and token usage in real-time
+1. Run the complete HR pipeline with **parallel subagent execution**
+2. See the Pipeline Runs page (runs.html) visualizing parallel branches live
+3. Chat with the HR concierge agent (Alex) via the web UI
+4. Write and run tests
+5. Master VSCode debugging with breakpoints
 
-**Key Message:** "You can't fix what you can't see. Debugging agents requires understanding the state at every step."
+**Key Message:** "You can't fix what you can't see. The Pipeline Runs page lets you watch each node's output, parallel branches, scores, and reasoning in real time."
 
 ---
 
@@ -27,153 +29,148 @@
 **Everyone check their environment:**
 
 ```bash
-cd agents2/oreilly-agent-mvp
+cd agents2/contoso-hr-agent
 
 # Check Python
 python --version  # Should be 3.11+
 
-# Check virtual environment
-ls .venv  # Should exist
+# First-time setup (creates venv, installs deps, seeds ChromaDB)
+uv venv && uv sync && uv run hr-seed
 
-# Activate venv
-source .venv/Scripts/activate  # Git Bash
-# OR
-.\.venv\Scripts\Activate.ps1   # PowerShell
-
-# Check dependencies
-pip list | grep langchain
+# Verify .env
+cat .env | grep -E "AZURE_AI_FOUNDRY"
+# Should show your endpoint, key, and model names
 ```
 
-**Verify API key:**
+**Required env vars (from .env.example):**
 
-```bash
-cat .env | grep -E "ANTHROPIC|OPENAI"
-# Should show your key (no spaces, no quotes)
-```
+- `AZURE_AI_FOUNDRY_ENDPOINT`
+- `AZURE_AI_FOUNDRY_KEY`
+- `AZURE_AI_FOUNDRY_CHAT_MODEL`
+- `AZURE_AI_FOUNDRY_EMBEDDING_MODEL`
 
 ### First Pipeline Run (10 minutes)
 
-**Launch the interactive menu:**
+**Start the FastAPI engine:**
 
 ```bash
-agent-menu
+uv run hr-engine
+# Starts on http://localhost:8080
 ```
 
-**Walk through the menu options:**
+**Open the web UI in your browser:**
 
+- **Chat page:** <http://localhost:8080> (chat.html) -- talk to Alex the HR concierge, upload resumes
+- **Candidates page:** <http://localhost:8080/candidates.html> -- results grid of evaluated candidates
+- **Pipeline Runs page:** <http://localhost:8080/runs.html> -- live pipeline execution trace
+
+**Demo: Upload a resume via the Chat page:**
+
+1. Open http://localhost:8080
+2. Click the upload button or drop a resume file (.txt, .md, .pdf, .docx)
+3. Watch the pipeline execute
+
+**While it runs, narrate the Pipeline Runs page (runs.html):**
+
+- "The intake node validates the ResumeSubmission..."
+- "Now watch -- policy_expert and resume_analyst start **at the same time** (parallel fan-out)..."
+- "PolicyExpertAgent queries ChromaDB for HR policy context..."
+- "ResumeAnalystAgent optionally searches the web via Brave Search..."
+- "Both complete, and decision_maker receives merged results (fan-in)..."
+- "DecisionMakerAgent renders the final disposition..."
+- "The notify node writes the EvaluationResult"
+
+**Show the output on the Candidates page:**
+
+- Candidate name, disposition (Strong Match / Possible Match / Needs Review / Not Qualified)
+- Skills match score, experience score
+- Strengths, red flags, reasoning, next steps
+
+### Understanding the Parallel Pipeline
+
+**This is the key teaching demo. Draw on whiteboard:**
+
+```text
+                    +---> [policy_expert] ---+
+                    |     (ChromaDB query)   |
+[intake] --> fan-out                         fan-in --> [decision_maker] --> [notify]
+                    |                        |
+                    +---> [resume_analyst] --+
+                          (Brave Search)
 ```
-╔═══════════════════════════════════════╗
-║     O'Reilly Agent MVP                ║
-╠═══════════════════════════════════════╣
-║  1. Request an issue from GitHub      ║
-║  2. Load a mock issue                 ║
-║  3. Watch incoming/ folder            ║
-║  4. View recent results               ║
-║  5. Exit                              ║
-╚═══════════════════════════════════════╝
+
+**LangGraph code that makes this happen:**
+
+```python
+# pipeline/graph.py
+builder.add_edge("intake", "policy_expert")      # fan-out edge 1
+builder.add_edge("intake", "resume_analyst")      # fan-out edge 2
+builder.add_edge("policy_expert", "decision_maker")   # fan-in edge 1
+builder.add_edge("resume_analyst", "decision_maker")   # fan-in edge 2
 ```
 
-**Demo with mock issue:**
+**Say:** "This is the subagent pattern. LangGraph owns the routing and state. CrewAI owns the persona execution inside each node. The two frameworks are fully coupled -- each crew node creates a Crew with one agent and one task, then calls crew.kickoff()."
 
-1. Select option `2` (Load a mock issue)
-2. Choose `issue_001.json` (API Rate Limiting)
-3. Confirm `y` to process
+### The Four Dispositions
 
-**While it runs, narrate:**
-
-- "PM Agent is analyzing the issue..."
-- "Dev Agent is writing code based on PM's plan..."
-- "QA Agent is reviewing the implementation..."
-- "Each agent adds to the pipeline state"
-
-**Show the output:**
-
-```bash
-# List results
-ls outgoing/
-
-# View the latest result
-cat outgoing/result_*.json | jq .
-
-# Key sections to point out:
-cat outgoing/result_*.json | jq .pm.summary
-cat outgoing/result_*.json | jq .dev.files
-cat outgoing/result_*.json | jq .qa.verdict
-```
-
-### Understanding the Mock Issues
-
-**Available mock issues (use for testing):**
-
-| Issue | Description | Complexity |
-| --- | --- | --- |
-| 001 | API Rate Limiting | Medium |
-| 002 | User Authentication | High |
-| 003 | Data Export | Low |
-| 004 | Dashboard Performance | High |
-| 005 | Email Notifications | Medium |
-| 006 | Search Functionality | Medium |
-
-**Say:** "Each mock issue tests different agent behaviors. Use them to verify changes."
+| Disposition | Meaning |
+| --- | --- |
+| **Strong Match** | Candidate meets or exceeds all criteria |
+| **Possible Match** | Candidate has potential but gaps exist |
+| **Needs Review** | Requires human review for edge cases |
+| **Not Qualified** | Candidate does not meet minimum criteria |
 
 ---
 
 ## Understanding the Architecture (10 minutes)
 
-### Pipeline State Flow
+### Pipeline State Flow (HRState TypedDict)
 
 **Draw on whiteboard:**
 
-```
-┌──────────────┐
-│ PipelineState│
-├──────────────┤
-│ run_id       │
-│ issue        │ ← load_issue fills this
-│ pm_output    │ ← pm_node fills this
-│ dev_output   │ ← dev_node fills this
-│ qa_output    │ ← qa_node fills this
-│ token_usages │ ← each node appends
-│ result       │ ← finalize_node fills this
-└──────────────┘
-```
-
-**Key insight:** "State is a bucket that passes from node to node. Each agent reads what it needs and adds its output."
-
-### The Graph Definition
-
-**Show the code:**
-
-```python
-# src/agent_mvp/pipeline/graph.py (lines 312-330)
-def create_pipeline_graph() -> StateGraph:
-    builder = StateGraph(PipelineState)
-
-    # Add nodes
-    builder.add_node("load_issue", load_issue_node)
-    builder.add_node("pm", pm_node)
-    builder.add_node("dev", dev_node)
-    builder.add_node("qa", qa_node)
-    builder.add_node("finalize", finalize_node)
-
-    # Define edges (linear flow)
-    builder.set_entry_point("load_issue")
-    builder.add_edge("load_issue", "pm")
-    builder.add_edge("pm", "dev")
-    builder.add_edge("dev", "qa")
-    builder.add_edge("qa", "finalize")
-    builder.add_edge("finalize", END)
-
-    return builder.compile()
+```text
++-------------------+
+| HRState           |
++-------------------+
+| session_id        |
+| resume_submission | <-- intake fills this (validated ResumeSubmission)
+| policy_context    | <-- policy_expert fills this (PolicyContext from ChromaDB)
+| candidate_eval    | <-- resume_analyst fills this (CandidateEval with scores)
+| hr_decision       | <-- decision_maker fills this (HRDecision with disposition)
+| evaluation_result | <-- notify fills this (final EvaluationResult)
++-------------------+
 ```
 
-**Visual representation:**
+**Key insight:** "State is a bucket that passes from node to node. Each agent reads what it needs and adds its output. The parallel nodes (policy_expert and resume_analyst) write to different keys, so there are no conflicts."
 
-```
-load_issue → pm → dev → qa → finalize → END
+### The Data Model Chain
+
+```text
+ResumeSubmission (input)
+  -> PolicyContext     (ChromaDB retrieval result)
+  -> CandidateEval    (skills_match_score, experience_score, strengths, red_flags)
+  -> HRDecision       (disposition, reasoning, next_steps, overall_score)
+  -> EvaluationResult (final -- written to SQLite + served by API)
 ```
 
-**Ask:** "What would you change to make PM and QA run in parallel?"
+### The Four CrewAI Agents
+
+| Agent | Pipeline Node | Tools | Purpose |
+| --- | --- | --- | --- |
+| ChatConciergeAgent ("Alex") | /api/chat | query_hr_policy | Interactive HR Q&A via web UI |
+| PolicyExpertAgent | policy_expert | query_hr_policy | Assesses resume against HR policy (ChromaDB) |
+| ResumeAnalystAgent | resume_analyst | brave_web_search | Scores candidate fit, optional web research |
+| DecisionMakerAgent | decision_maker | none (pure reasoning) | Renders final disposition |
+
+### Chat Features
+
+**The Chat page (chat.html) includes:**
+
+- Session management (create new, switch sessions)
+- Past sessions panel (sidebar listing previous conversations)
+- 6 suggestion buttons for common HR questions
+- Past session context injected into the concierge agent prompt (last 20 turns)
+- Two-layer memory: `localStorage` in browser + JSON files in `data/chat_sessions/{session_id}.json`
 
 ---
 
@@ -184,12 +181,11 @@ load_issue → pm → dev → qa → finalize → END
 **Show the test structure:**
 
 ```bash
-tree tests/
+ls tests/
 # tests/
-# ├── test_schema.py        # Pydantic model validation
-# ├── test_fs_moves.py      # File system utilities
-# ├── test_mcp_server.py    # MCP server validation
-# └── conftest.py           # Shared fixtures
+# +-- test_models.py        # Pydantic model validation
+# +-- test_config.py         # Configuration tests
+# +-- conftest.py            # Shared fixtures
 ```
 
 **Say:** "Tests verify contracts. When you change code, tests catch regressions."
@@ -199,32 +195,20 @@ tree tests/
 **Basic test run:**
 
 ```bash
-pytest
+uv run pytest tests/ -v
 ```
 
 **With coverage:**
 
 ```bash
-pytest --cov=agent_mvp
+uv run pytest --cov=contoso_hr
 ```
 
-**Expected output:**
-
-```
-========================= test session starts =========================
-collected 12 items
-
-tests/test_schema.py ....                                        [ 33%]
-tests/test_fs_moves.py ....                                      [ 66%]
-tests/test_mcp_server.py ....                                    [100%]
-
-========================= 12 passed in 2.34s ==========================
-```
-
-**Verbose mode (see each test):**
+**Lint and format check:**
 
 ```bash
-pytest -v
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
 ```
 
 ### Run Specific Tests (5 minutes)
@@ -232,22 +216,22 @@ pytest -v
 **Single file:**
 
 ```bash
-pytest tests/test_schema.py -v
+uv run pytest tests/test_models.py -v
 ```
 
 **Single test function:**
 
 ```bash
-pytest tests/test_schema.py::test_issue_validation -v
+uv run pytest tests/test_models.py::test_resume_submission_validation -v
 ```
 
 **Pattern matching:**
 
 ```bash
-pytest -k "token" -v  # All tests with "token" in name
+uv run pytest -k "policy" -v  # All tests with "policy" in name
 ```
 
-**Hands-on:** "Everyone run the schema tests and verify they pass."
+**Hands-on:** "Everyone run the model tests and verify they pass."
 
 ---
 
@@ -255,13 +239,13 @@ pytest -k "token" -v  # All tests with "token" in name
 
 ### Open VSCode Correctly (2 minutes)
 
-**IMPORTANT:** Open the `agents2/` folder, NOT `oreilly-agent-mvp/`.
+**IMPORTANT:** Open the `agents2/` folder, NOT `contoso-hr-agent/`.
 
 ```bash
 code c:/github/agents2
 ```
 
-**Why?** The launch configurations set PYTHONPATH relative to this root.
+**Why?** The launch configurations and PYTHONPATH are set relative to this root.
 
 ### Available Debug Configurations (3 minutes)
 
@@ -269,14 +253,13 @@ code c:/github/agents2
 
 | Config | Purpose | Best For |
 | --- | --- | --- |
-| Interactive Menu | Full menu with all options | Testing user flows |
-| Run Once (001-006) | Pipeline with specific mock | Testing full flow |
-| Folder Watcher | Event-driven processing | Testing automation |
-| MCP Server | MCP tools/resources | Testing MCP |
+| HR Engine | FastAPI on port 8080 | Testing the full web UI |
+| Folder Watcher | Event-driven resume processing | Testing file drop automation |
+| MCP Server | FastMCP 2 on port 8081 | Testing MCP tools/resources |
 | Run Tests (All) | All pytest tests | TDD workflow |
-| Pipeline Graph (Step Through) | Pauses immediately | Learning execution flow |
+| Seed Knowledge | Re-seed ChromaDB | Testing knowledge ingestion |
 
-**Say:** "Start with 'Pipeline Graph (Step Through)' -- it pauses at the first line so you can step through everything."
+**Say:** "Start with 'HR Engine' -- it gives you the full web UI with chat, candidates, and pipeline runs."
 
 ### Essential Keyboard Shortcuts (2 minutes)
 
@@ -289,97 +272,94 @@ code c:/github/agents2
 | **Shift+F11** | Step Out (exit function) |
 | **Ctrl+Shift+Y** | Open Debug Console |
 
-### Demo: Step Through the Pipeline (8 minutes)
+### Demo: Step Through the Parallel Pipeline (8 minutes)
 
 **Setup:**
 
 1. Open VSCode in `agents2/`
-2. Open `oreilly-agent-mvp/src/agent_mvp/pipeline/graph.py`
+2. Open `contoso-hr-agent/src/contoso_hr/pipeline/graph.py`
 3. Set breakpoints at:
-   - Line ~100: Inside `pm_node()` after `response = llm.invoke()`
-   - Line ~170: Inside `dev_node()` after `response = llm.invoke()`
-   - Line ~240: Inside `qa_node()` after `response = llm.invoke()`
+   - Inside `intake_node()` after validation
+   - Inside `policy_expert_crew_node()` after `crew.kickoff()`
+   - Inside `resume_analyst_crew_node()` after `crew.kickoff()`
+   - Inside `decision_maker_crew_node()` after `crew.kickoff()`
 
 **Run:**
 
-1. Press F5
-2. Select "Run Once (Mock Issue 001)"
-3. When it pauses at pm_node:
-   - **Variables pane:** Expand `state` to see `issue` data
-   - **Debug Console:** Type `state["issue"]["title"]`
-   - Press F5 to continue to next breakpoint
+1. Press F5, select "HR Engine"
+2. Upload a resume via <http://localhost:8080>
+3. When it pauses at intake_node:
+   - **Variables pane:** Expand `state` to see `resume_submission`
+   - **Debug Console:** Type `state["resume_submission"]`
+   - Press F5 to continue
 
-4. When it pauses at dev_node:
-   - **Check:** `state["pm_output"]` now exists
-   - **Debug Console:** `state["pm_output"]["plan"]`
+4. When it pauses at policy_expert_crew_node:
+   - **Check:** `state["resume_submission"]` exists
+   - **Debug Console:** Inspect the PolicyContext being built
    - Press F5
 
-5. When it pauses at qa_node:
-   - **Check:** Both `pm_output` and `dev_output` exist
-   - **Debug Console:** `len(state["dev_output"]["files"])`
+5. When it pauses at decision_maker_crew_node:
+   - **Check:** Both `policy_context` and `candidate_eval` exist
+   - **Debug Console:** `state["candidate_eval"]["skills_match_score"]`
 
-**Key insight:** "Watch state.keys() grow: issue → pm_output → dev_output → qa_output → result"
+**Key insight:** "Watch state keys grow through the pipeline. In production, the runs.html page shows all of this live."
 
-### Hands-On: Debug Token Tracking (5 minutes)
+### Hands-On: Debug the Chat Concierge (5 minutes)
 
-**Set breakpoint in token tracking:**
+**Set breakpoint in the chat endpoint:**
 
-Open `oreilly-agent-mvp/src/agent_mvp/util/token_tracking.py`
+Open `contoso-hr-agent/src/contoso_hr/engine.py`
 
-Set breakpoint at line ~40 (inside `extract_token_usage`):
+Set breakpoint in the `/api/chat` handler.
 
-```python
-def extract_token_usage(response, model_name: str) -> Optional[TokenUsage]:
-    # BREAKPOINT HERE
-    ...
-```
-
-**Run with Mock Issue 001:**
+**Run with "HR Engine" config:**
 
 When it stops:
-- Inspect `response` object
-- Check `response.usage_metadata`
-- See `input_tokens` and `output_tokens`
+
+- Inspect the incoming chat message
+- See how session context (last 20 turns) is included
+- Watch the ChatConciergeAgent ("Alex") query ChromaDB via `query_hr_policy`
 
 **Debug Console commands:**
 
 ```python
-response.usage_metadata
-response.content[:200]  # First 200 chars of response
+request.message
+request.session_id
 ```
 
 ---
 
 ## Common Debugging Scenarios (5 minutes)
 
-### Scenario 1: "Why is QA failing?"
+### Scenario 1: "Why did a candidate get 'Not Qualified'?"
 
-1. Run "Run Once (Mock Issue 001)"
-2. Set breakpoint in `qa_node` before return
-3. Inspect `qa_data["verdict"]` and `qa_data["findings"]`
-4. Check if findings are reasonable or hallucinated
+1. Open runs.html and find the pipeline run
+2. Check policy_expert output -- what policies were matched?
+3. Check resume_analyst output -- what scores were assigned?
+4. Check decision_maker reasoning -- what drove the disposition?
+5. Set breakpoints in the crew nodes to inspect intermediate state
 
-### Scenario 2: "Token costs seem high"
+### Scenario 2: "ChromaDB returns no results"
 
-1. Add watch expression: `state.get("token_usages", [])`
-2. Step through each agent
-3. Compare input_tokens vs output_tokens
-4. Identify which agent is expensive
+1. Verify knowledge base is seeded: `uv run hr-seed`
+2. Check `data/chroma/` directory exists and has files
+3. Set breakpoint in `knowledge/retriever.py` at `query_policy_knowledge()`
+4. Inspect the embedding query and results
 
-### Scenario 3: "Pipeline hangs at dev_node"
+### Scenario 3: "Chat agent doesn't remember context"
 
-1. Enable "Break on Exception" (Debug sidebar → Breakpoints)
-2. Run pipeline
+1. Check `data/chat_sessions/{session_id}.json` exists
+2. Verify `localStorage` in browser dev tools
+3. Set breakpoint in `/api/chat` to inspect the transcript context
+4. Confirm last 20 turns are being injected into the task prompt
+
+### Scenario 4: "Pipeline hangs at a crew node"
+
+1. Enable "Break on Exception" (Debug sidebar -> Breakpoints)
+2. Run the pipeline
 3. When it hangs, press pause button
 4. Check Call Stack to see where it's stuck
-5. Often: API timeout or rate limiting
-
-### Scenario 4: "JSON parsing error"
-
-1. Set breakpoint at `_extract_json()` function
-2. Step through regex matching
-3. Inspect `response.content` for malformed JSON
-4. Check if LLM returned natural language instead
+5. Often: Azure AI Foundry timeout or rate limiting
 
 ---
 
@@ -387,43 +367,56 @@ response.content[:200]  # First 200 chars of response
 
 ### What We Accomplished
 
-- Ran the full PM → Dev → QA pipeline
-- Understood state flow through the graph
+- Ran the full parallel HR pipeline (intake -> [policy_expert || resume_analyst] -> decision_maker -> notify)
+- Saw live pipeline execution on runs.html with parallel branches visualized
+- Chatted with the HR concierge agent (Alex) via the web UI
+- Understood the data model chain (ResumeSubmission -> EvaluationResult)
 - Ran tests with pytest
 - Mastered VSCode debugging with breakpoints
-- Inspected variables and token usage in real-time
 
 ### What's Next (Hour 3)
 
-- Configure MCP server for external integration
-- Add a new feature: RAG vector source
-- Vibe coding with Claude Code
-- Local, cheap vector database setup
+- Configure the MCP server (FastMCP 2) for external integration
+- Test MCP tools with the MCP Inspector
+- Vibe code a new feature with Claude Code
+- Deep dive into ChromaDB knowledge retrieval
 
 ### Quick Reference Card
 
-**Run pipeline:**
+**Start the engine:**
+
 ```bash
-agent-menu
+uv run hr-engine          # FastAPI on http://localhost:8080
 ```
 
+**Web pages:**
+
+- <http://localhost:8080> -- Chat with Alex + upload resumes
+- <http://localhost:8080/candidates.html> -- Results grid
+- <http://localhost:8080/runs.html> -- Pipeline Runs trace (parallel branches)
+
 **Run tests:**
+
 ```bash
-pytest -v
-pytest --cov=agent_mvp
+uv run pytest tests/ -v
+uv run pytest --cov=contoso_hr
 ```
 
 **Debug in VSCode:**
-1. F5 → Select config
-2. F9 → Toggle breakpoint
-3. F10 → Step over
-4. Ctrl+Shift+Y → Debug console
+
+1. F5 -> Select config
+2. F9 -> Toggle breakpoint
+3. F10 -> Step over
+4. Ctrl+Shift+Y -> Debug console
 
 **Inspect state:**
+
 ```python
 state.keys()
-state["pm_output"]["plan"]
-state.get("token_usages", [])
+state["resume_submission"]
+state["policy_context"]
+state["candidate_eval"]["skills_match_score"]
+state["hr_decision"]["disposition"]
 ```
 
 ---
@@ -433,15 +426,17 @@ state.get("token_usages", [])
 ### If VSCode Debugging Doesn't Work
 
 **Check:**
-1. Opened `agents2/` not `oreilly-agent-mvp/`
+
+1. Opened `agents2/` not `contoso-hr-agent/`
 2. Python extension installed
 3. Correct Python interpreter selected (bottom status bar)
 4. `.venv` activated
 
 **Fix PYTHONPATH issues:**
+
 ```bash
 # In terminal before launching VSCode
-export PYTHONPATH=$PWD/oreilly-agent-mvp/src
+export PYTHONPATH=$PWD/contoso-hr-agent/src
 code .
 ```
 
@@ -449,57 +444,67 @@ code .
 
 **Common issues:**
 
-1. Missing dependencies: `pip install -e .`
+1. Missing dependencies: `uv sync`
 2. Missing `.env` file: Copy from `.env.example`
-3. API key issues: Check for spaces/quotes
+3. ChromaDB not seeded: `uv run hr-seed`
+4. API key issues: Check for spaces/quotes in `.env`
 
 ### If Pipeline Hangs
 
 **Causes:**
-- API rate limiting (wait 60 seconds)
+
+- Azure AI Foundry rate limiting (wait 60 seconds)
 - Network issues (check connectivity)
-- Model overload (try different provider)
+- Model deployment not ready
 
-**Fix:** Add timeout to `llm.invoke()`:
+### Highlight the Parallel Execution
 
-```python
-response = llm.invoke([...], timeout=60)
-```
+**This is the key teaching moment.** When showing runs.html:
+
+- Point out that policy_expert and resume_analyst start at the same time
+- Show the timestamps -- they overlap, proving concurrency
+- Explain fan-out (one node to many) and fan-in (many nodes to one)
+- Ask: "What would happen if we added a fifth agent in parallel?"
 
 ### Time Management
 
 - If setup takes too long: Demo on your screen
-- If students are ahead: Challenge them to add a 4th agent
+- If students are ahead: Challenge them to add a 5th agent to the pipeline
 - If debugging is confusing: Focus on just F5/F10/F9
 
 ---
 
 ## Advanced: Conditional Breakpoints
 
-**Right-click breakpoint → Edit Breakpoint → Expression:**
+**Right-click breakpoint -> Edit Breakpoint -> Expression:**
 
 ```python
-# Only stop if tokens are high
-token_usage.total_tokens > 5000
+# Only stop if score is low
+state["candidate_eval"]["skills_match_score"] < 50
 
-# Only stop on errors
+# Only stop on specific disposition
+state["hr_decision"]["disposition"] == "Not Qualified"
+
+# Only stop for errors
 state.get("error") is not None
-
-# Only stop for specific agent
-agent_name == "QA"
 ```
 
 ---
 
 ## File Reference
 
-| File | Purpose | Key Lines |
-| --- | --- | --- |
-| `pipeline/graph.py` | Graph definition and nodes | 44-70 (state), 100-150 (pm_node), 312-330 (graph) |
-| `pipeline/prompts.py` | Agent prompts | 8-20 (PM), 78-90 (Dev), 138-150 (QA) |
-| `util/token_tracking.py` | Token extraction and cost | 40 (extract), 90 (cost) |
-| `models.py` | Pydantic data models | 15-45 (Issue), 40-60 (PMOutput) |
-| `config.py` | Environment and LLM config | 15-30 (env vars), 50-70 (get_llm) |
+| File | Purpose |
+| --- | --- |
+| `pipeline/graph.py` | LangGraph StateGraph, HRState TypedDict, all 5 node functions, `create_hr_graph()` |
+| `pipeline/agents.py` | ChatConciergeAgent, PolicyExpertAgent, ResumeAnalystAgent, DecisionMakerAgent (CrewAI) |
+| `pipeline/tasks.py` | CrewAI Task factories (inject prior state into task descriptions) |
+| `pipeline/tools.py` | `@tool query_hr_policy` (ChromaDB) + `@tool brave_web_search` (Brave API) |
+| `pipeline/prompts.py` | Agent system prompts |
+| `models.py` | Pydantic v2 model chain: ResumeSubmission -> PolicyContext -> CandidateEval -> HRDecision -> EvaluationResult |
+| `config.py` | Config dataclass, Azure AI Foundry LLM/embeddings factory |
+| `engine.py` | FastAPI: /api/chat, /api/upload, /api/candidates, /api/stats, /api/chat/history/{id} |
+| `knowledge/retriever.py` | `query_policy_knowledge(question, k)` -> PolicyContext |
+| `knowledge/vectorizer.py` | Ingest policy docs -> Azure embeddings -> ChromaDB |
 
 ---
 

@@ -21,10 +21,10 @@ The **Contoso HR Agent** is an automated resume screening and HR policy Q&A syst
 
 | Pillar | What It Shows | Where to Look |
 |--------|---------------|---------------|
-| **Interactive Chat** | Web chat UI backed by a CrewAI ChatConcierge agent grounded in ChromaDB policy retrieval | `web/chat.html`, `engine.py /api/chat` |
+| **Interactive Chat** | Web chat UI backed by a CrewAI ChatConcierge agent grounded in ChromaDB policy retrieval; past-session context (last 6 turns from last 2 sessions) injected into each prompt | `web/chat.html`, `engine.py /api/chat` |
 | **Event-Driven Autonomy** | File watcher polls `data/incoming/` -- drop a resume and the full pipeline runs automatically | `watcher/resume_watcher.py` |
 | **Memory and State** | LangGraph `SqliteSaver` checkpoints + SQLite candidate store + server-side chat session JSON | `memory/`, `data/hr.db`, `data/checkpoints.db` |
-| **LLM Reasoning** | LangGraph StateGraph orchestrates 3 CrewAI specialist agents through a 5-node pipeline | `pipeline/graph.py`, `pipeline/agents.py` |
+| **Parallel LLM Reasoning** | LangGraph StateGraph fan-out/fan-in: `policy_expert` and `resume_analyst` run **concurrently**, then fan-in to `decision_maker` | `pipeline/graph.py`, `pipeline/agents.py` |
 | **MCP Tool Calling** | FastMCP 2 SSE server exposes tools, resources, and prompts to external AI clients | `mcp_server/server.py` (port 8081) |
 
 ---
@@ -37,26 +37,28 @@ flowchart LR
     subgraph Browser["Browser"]
         direction TB
         ChatUI["chat.html\nChat + Upload"]
-        CandUI["candidates.html\nGrid + Detail"]
+        CandUI["candidates.html\nCandidate Grid"]
+        RunsUI["runs.html\nPipeline Trace"]
     end
 
     subgraph FastAPI["FastAPI :8080"]
         direction TB
-        ChatAPI["/api/chat"]
+        ChatAPI["/api/chat\n/api/chat/sessions"]
         UploadAPI["/api/upload"]
-        CandAPI["/api/candidates\n/api/stats"]
+        CandAPI["/api/candidates\n/api/candidates/{id}\n/api/stats"]
+        HealthAPI["/api/health"]
     end
 
     subgraph Agents["CrewAI Agents"]
         direction TB
-        Concierge["ChatConcierge\nChat + Q&A"]
-        Pipeline["LangGraph\nPipeline\n5 nodes"]
+        Concierge["ChatConcierge\n'Alex'\nChat + Q&A"]
+        Pipeline["LangGraph Pipeline\nparallel fan-out/fan-in"]
     end
 
     subgraph Storage["Data Stores"]
         direction TB
         SQLite[("SQLite\nhr.db")]
-        Chroma[("ChromaDB\n146 chunks")]
+        Chroma[("ChromaDB\n146 chunks\n8 docs")]
         Checkpoints[("Checkpoints\ncheckpoints.db")]
         ChatMem[("Chat Sessions\nJSON files")]
     end
@@ -69,6 +71,7 @@ flowchart LR
     ChatUI -- "chat messages" --> ChatAPI
     ChatUI -- "file upload" --> UploadAPI
     CandUI -- "read results" --> CandAPI
+    RunsUI -- "trace data" --> CandAPI
 
     ChatAPI --> Concierge
     UploadAPI -- "saves to\ndata/incoming/" --> Incoming
@@ -133,8 +136,9 @@ cp .env.example .env
 .\scripts\start.ps1         # Windows PowerShell
 
 # 5. Open the UI
-#    Chat:       http://localhost:8080/chat.html
-#    Candidates: http://localhost:8080/candidates.html
+#    Chat:           http://localhost:8080/chat.html
+#    Candidates:     http://localhost:8080/candidates.html
+#    Pipeline Runs:  http://localhost:8080/runs.html
 ```
 
 ### Individual Services
@@ -148,9 +152,11 @@ uv run hr-seed --reset      # Clear and re-seed ChromaDB
 
 ---
 
-## LangGraph Pipeline Flow
+## LangGraph Pipeline Flow (Parallel Fan-Out / Fan-In)
 
 The pipeline runs once per resume. LangGraph owns **when** and **state**. CrewAI owns **who** and **what**. Each node wraps exactly one `Crew.kickoff()` call.
+
+**Key teaching point:** After `intake`, the `policy_expert` and `resume_analyst` nodes run **concurrently** (parallel fan-out). Both must complete before `decision_maker` begins (fan-in). This pattern demonstrates how LangGraph supports parallel branches for independent work, reducing total pipeline latency.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#0078D4', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#005A9E', 'secondaryColor': '#E8E8E8', 'tertiaryColor': '#50B0F0', 'lineColor': '#767676', 'fontFamily': 'Segoe UI, sans-serif', 'fontSize': '14px'}}}%%
@@ -161,17 +167,27 @@ flowchart TD
         Intake["Validate\nResumeSubmission"]
     end
 
-    subgraph Node2["Node 2: policy_expert"]
-        PE_Agent["PolicyExpertAgent\nCrewAI"]
-        PE_Tool["query_hr_policy\nChromaDB RAG"]
-        PE_Agent --> PE_Tool
+    Intake -- "fan-out" --> PE_Agent
+    Intake -- "fan-out" --> RA_Agent
+
+    subgraph Parallel["Parallel Execution"]
+        direction LR
+
+        subgraph Node2["Node 2: policy_expert"]
+            PE_Agent["PolicyExpertAgent\nCrewAI"]
+            PE_Tool["query_hr_policy\nChromaDB RAG"]
+            PE_Agent --> PE_Tool
+        end
+
+        subgraph Node3["Node 3: resume_analyst"]
+            RA_Agent["ResumeAnalystAgent\nCrewAI"]
+            RA_Tool["brave_web_search\nBrave API"]
+            RA_Agent --> RA_Tool
+        end
     end
 
-    subgraph Node3["Node 3: resume_analyst"]
-        RA_Agent["ResumeAnalystAgent\nCrewAI"]
-        RA_Tool["brave_web_search\nBrave API"]
-        RA_Agent --> RA_Tool
-    end
+    PE_Agent -- "fan-in" --> DM_Agent
+    RA_Agent -- "fan-in" --> DM_Agent
 
     subgraph Node4["Node 4: decision_maker"]
         DM_Agent["DecisionMakerAgent\nCrewAI"]
@@ -183,9 +199,6 @@ flowchart TD
         Notify["Assemble\nEvaluationResult\nLog summary"]
     end
 
-    Intake -- "ResumeSubmission" --> PE_Agent
-    PE_Agent -- "PolicyContext" --> RA_Agent
-    RA_Agent -- "CandidateEval\nskills + experience scores" --> DM_Agent
     DM_Agent -- "HRDecision\n4 dispositions" --> Notify
 
     Notify --> Done([Pipeline Complete])
@@ -206,6 +219,7 @@ flowchart TD
     Node5 -- "checkpoint" --> CP
 
     style Node1 fill:#E8E8E8,stroke:#767676,color:#000000
+    style Parallel fill:#F3F2F1,stroke:#0078D4,color:#000000
     style Node2 fill:#0078D4,stroke:#005A9E,color:#FFFFFF
     style Node3 fill:#50B0F0,stroke:#0078D4,color:#000000
     style Node4 fill:#C08000,stroke:#8B5E00,color:#FFFFFF
@@ -238,6 +252,34 @@ ResumeSubmission  (input: candidate name, resume text, file path)
 
 ---
 
+## Web UI (Three Pages)
+
+All three pages are linked in the navigation bar: **Chat | Candidates | Pipeline Runs**.
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| **Chat** | `/chat.html` | Chat with the ChatConcierge agent ("Alex"), upload resumes, "New chat" and "Clear history" buttons, Past Sessions panel in right sidebar with click-to-restore |
+| **Candidates** | `/candidates.html` | Evaluation grid with detail modal for each candidate |
+| **Pipeline Runs** | `/runs.html` | Pipeline Trace viewer -- split-panel view showing full pipeline execution per run, including the parallel `policy_expert` and `resume_analyst` branches |
+
+---
+
+## API Endpoints
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `/api/chat` | Send a chat message to the ChatConcierge agent |
+| POST | `/api/upload` | Upload a resume file to `data/incoming/` |
+| GET | `/api/candidates` | List all evaluated candidates |
+| GET | `/api/candidates/{id}` | Get full evaluation for one candidate |
+| GET | `/api/stats` | Aggregate evaluation statistics |
+| GET | `/api/health` | Health check |
+| GET | `/api/chat/history/{id}` | Retrieve chat history for a session |
+| DELETE | `/api/chat/history/{id}` | Delete chat history for a session |
+| GET | `/api/chat/sessions` | List all chat sessions |
+
+---
+
 ## Demo Walkthrough
 
 Follow these five steps to see every pillar in action:
@@ -248,7 +290,7 @@ Open `http://localhost:8080/chat.html` and ask a policy question:
 
 > "What are the minimum qualifications for the MCT trainer position?"
 
-The ChatConcierge agent retrieves policy chunks from ChromaDB and responds with grounded answers -- no hallucination.
+The ChatConcierge agent retrieves policy chunks from ChromaDB and responds with grounded answers -- no hallucination. Use the Past Sessions sidebar to restore earlier conversations.
 
 ### Step 2 -- Upload a Resume
 
@@ -259,18 +301,34 @@ Use the upload button in `chat.html` to submit one of the sample resumes (e.g., 
 The file watcher detects the new resume within 3 seconds and triggers the full LangGraph pipeline. Watch the terminal for Rich-formatted logs as each agent runs:
 
 1. **intake** validates the submission
-2. **policy_expert** retrieves relevant HR policies from ChromaDB
-3. **resume_analyst** scores the candidate (optionally searches the web via Brave)
-4. **decision_maker** renders a disposition with reasoning
-5. **notify** assembles the final result and writes to SQLite
+2. **policy_expert** and **resume_analyst** run **in parallel** (fan-out)
+   - policy_expert retrieves relevant HR policies from ChromaDB
+   - resume_analyst scores the candidate (optionally searches the web via Brave)
+3. **decision_maker** renders a disposition with reasoning (fan-in)
+4. **notify** assembles the final result and writes to SQLite
 
-### Step 4 -- Review Results and Memory
+### Step 4 -- Review Results and Traces
 
-Open `http://localhost:8080/candidates.html` to see the evaluation grid. Click any candidate for the full detail modal. Chat history persists in both localStorage (client) and `data/chat_sessions/` (server).
+Open `http://localhost:8080/candidates.html` to see the evaluation grid. Click any candidate for the full detail modal. Open `http://localhost:8080/runs.html` to inspect the pipeline trace for each run, including the parallel branches.
 
 ### Step 5 -- Explore MCP
 
 Start the MCP server with `uv run hr-mcp` and use [MCP Inspector](https://github.com/modelcontextprotocol/inspector) to call tools like `list_candidates`, `query_policy`, and `trigger_resume_evaluation`. This shows how external AI clients can interact with the pipeline programmatically.
+
+---
+
+## Engine Startup Output
+
+When the engine starts, it prints four URIs:
+
+```
+  Web UI:  http://localhost:8080/chat.html
+  API:     http://localhost:8080/api/
+  Docs:    http://localhost:8080/docs
+  MCP SSE: http://localhost:8081/sse
+```
+
+Ports 8080 (engine) and 8081 (MCP) are force-killed on every startup to avoid "address already in use" errors.
 
 ---
 
@@ -279,10 +337,13 @@ Start the MCP server with `uv run hr-mcp` and use [MCP Inspector](https://github
 ```
 agents2/
 ├── README.md                          # This file (course-level overview)
+├── CLAUDE.md                          # Claude Code guidance for this repo
+├── AGENTS.md                          # Repository guidelines for AI agents
 ├── contoso-hr-agent/                  # Primary demo project
 │   ├── src/contoso_hr/
 │   │   ├── pipeline/
-│   │   │   ├── graph.py               # LangGraph StateGraph, HRState, 5 node functions
+│   │   │   ├── graph.py               # LangGraph StateGraph, parallel fan-out/fan-in,
+│   │   │   │                          #   HRState, 5 node functions, create_hr_graph()
 │   │   │   ├── agents.py             # 4 CrewAI agents (ChatConcierge, PolicyExpert,
 │   │   │   │                          #   ResumeAnalyst, DecisionMaker)
 │   │   │   ├── tasks.py              # CrewAI Task factories
@@ -305,10 +366,12 @@ agents2/
 │   │   ├── models.py                  # Pydantic v2 data contracts (full model chain)
 │   │   └── logging_setup.py           # Rich-formatted structured logging
 │   ├── web/
-│   │   ├── chat.html                  # Chat UI + resume upload
+│   │   ├── chat.html                  # Chat UI + resume upload + Past Sessions sidebar
 │   │   ├── chat.js                    # Chat client logic + localStorage
 │   │   ├── candidates.html            # Evaluation grid + detail modal
 │   │   ├── candidates.js              # Candidate grid client logic
+│   │   ├── runs.html                  # Pipeline Trace viewer (split-panel, parallel branches)
+│   │   ├── runs.js                    # Pipeline trace client logic
 │   │   └── style.css                  # Shared styles
 │   ├── sample_resumes/                # 13 trainer candidate resumes (3 quality tiers)
 │   ├── sample_knowledge/              # 8 HR policy documents (PDF, DOCX, PPTX, MD)
@@ -316,7 +379,7 @@ agents2/
 │   │   ├── incoming/                  # Resume drop folder (watcher polls here)
 │   │   ├── processed/                 # Resumes after pipeline completes
 │   │   ├── outgoing/                  # JSON evaluation results
-│   │   ├── chroma/                    # ChromaDB vector store
+│   │   ├── chroma/                    # ChromaDB vector store (146 chunks, 8 docs)
 │   │   ├── chat_sessions/             # Server-side chat history JSON
 │   │   ├── hr.db                      # SQLite candidate + evaluation store
 │   │   └── checkpoints.db             # LangGraph state checkpoints
@@ -325,7 +388,7 @@ agents2/
 │   ├── pyproject.toml                 # uv project config + CLI entry points
 │   ├── .env.example                   # Environment variable template
 │   └── .mcp.json                      # MCP client configuration
-├── oreilly-agent-mvp/                 # Legacy reference (issue triage pipeline)
+├── oreilly-agent-mvp/                 # LEGACY reference (issue triage pipeline) -- not active
 ├── copilot-studio/                    # Copilot Studio demo assets
 ├── claude-agent/                      # Claude Code agent configuration
 ├── docs/                              # Course materials and supporting assets
@@ -392,7 +455,7 @@ az group delete --name contoso-hr-rg --yes --no-wait
 
 ## Legacy Reference
 
-The `oreilly-agent-mvp/` directory contains an earlier iteration of the course demo -- a GitHub issue triage pipeline. It is retained as reference material only. All learner-facing work uses `contoso-hr-agent/`.
+The `oreilly-agent-mvp/` directory contains an earlier iteration of the course demo -- a GitHub issue triage pipeline with PM/Dev/QA agents. It is retained as reference material only and is **not** the active project. All learner-facing work uses `contoso-hr-agent/`.
 
 ---
 

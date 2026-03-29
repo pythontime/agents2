@@ -1,127 +1,61 @@
-# Debugging Guide
+# Debugging Guide -- Contoso HR Agent
+
+**Last Updated:** 2026-03-29
+**Project:** `contoso-hr-agent/` within the `agents2` repository
+
+> **Historical note:** This file previously documented the `oreilly-agent-mvp/` project
+> (PM/Dev/QA issue-triage pipeline). That project is retained for reference but is no
+> longer actively developed. All debugging guidance below targets `contoso-hr-agent/`.
+
+---
 
 ## VSCode Launch Configurations
 
-This project includes comprehensive debugging configurations for easy data flow inspection.
-
 ### Quick Start
 
-1. **Open VSCode** in the `agents2/` repository root (not the subfolder!)
-2. Press `F5` or click the Run icon in the sidebar
-3. Select a configuration from the dropdown
-4. Set breakpoints by clicking in the gutter (left of line numbers)
-5. Run and inspect variables, step through code
+1. Open `C:\github\agents2\` in VSCode (the repo root, not the subfolder).
+2. Press `F5` or click the Run icon in the sidebar.
+3. Select a configuration from the dropdown.
+4. Set breakpoints by clicking in the gutter (left of line numbers).
+5. Run and inspect variables, step through code.
 
-> **Important:** The launch configurations are set up for opening `C:\github\agents2\` in VSCode. All paths automatically resolve to the `oreilly-agent-mvp/` subfolder.
+### Key Debugging Targets
 
-### Available Configurations (13 Total)
+| # | Config | Purpose | Key Breakpoint Locations |
+|---|--------|---------|--------------------------|
+| 1 | HR Engine | FastAPI on port 8080 | `contoso-hr-agent/src/contoso_hr/engine.py` |
+| 2 | HR Watcher | File watcher for `data/incoming/` | `contoso-hr-agent/src/contoso_hr/watcher/resume_watcher.py` |
+| 3 | MCP Server | FastMCP 2 on port 8081 | `contoso-hr-agent/src/contoso_hr/mcp_server/server.py` |
+| 4 | Run Tests | All pytest tests | `contoso-hr-agent/tests/` |
+| 5 | Debug Current File | Whatever file is open | Your open file |
 
-#### Interactive & CLI
+## Understanding Data Flow
 
-**Interactive Menu**
-- Launches the full interactive menu
-- **Best for**: Testing user flows, demoing the system
-- **Breakpoint tips**: Set in `oreilly-agent-mvp/src/agent_mvp/cli/interactive_menu.py`
+### Pipeline State Flow (Parallel)
 
-**Run Once (Mock Issue 001-006)**
-- Runs pipeline with specific mock issue
-- **6 configurations** - one for each mock issue:
-  - **001**: API rate limiting feature (timothywarner-org/agents2#101)
-  - **002**: User authentication enhancement (timothywarner-org/agents2#102)
-  - **003**: Data export functionality (timothywarner-org/agents2#103)
-  - **004**: Dashboard performance (timothywarner-org/agents2#104)
-  - **005**: Email notification system (timothywarner-org/agents2#105)
-  - **006**: Search functionality (timothywarner-org/agents2#106)
-- **Best for**: Testing full pipeline flow with different issue types
-- **Breakpoint tips**: Set in `oreilly-agent-mvp/src/agent_mvp/pipeline/graph.py` nodes (pm_node, dev_node, qa_node)
+The pipeline fans out after `intake` so that `policy_expert` and `resume_analyst` run
+concurrently. Both must complete before `decision_maker` (fan-in).
 
-**Folder Watcher**
-- Starts the file watcher for event-driven processing
-- **Best for**: Testing automated workflows, demo mode
-- **Breakpoint tips**: Set in `oreilly-agent-mvp/src/agent_mvp/watcher/process_file.py`
+```
+intake -> [policy_expert || resume_analyst] -> decision_maker -> notify
+```
 
-**MCP Server**
-- Launches the MCP server
-- **Best for**: Testing MCP tools and resources
-- **Breakpoint tips**: Set in `oreilly-agent-mvp/src/agent_mvp/mcp_server/server.py`
+Set breakpoints at these key points in `contoso-hr-agent/src/contoso_hr/pipeline/graph.py`:
 
-#### Testing
+1. **`intake_node()`** -- validates `ResumeSubmission`, sets run metadata.
+2. **`policy_expert_crew_node()`** -- CrewAI kickoff with `query_hr_policy` tool (ChromaDB). Produces `PolicyContext`.
+3. **`resume_analyst_crew_node()`** -- CrewAI kickoff with `brave_web_search` tool. Produces `CandidateEval`.
+4. **`decision_maker_crew_node()`** -- pure reasoning, renders `HRDecision`.
+5. **`notify_node()`** -- assembles `EvaluationResult`, logs Rich summary, persists to SQLite.
 
-**Run Tests (All)**
-- Executes all tests with debugging enabled
-- **Best for**: Test-driven development
-- **Breakpoint tips**: Set in test files or implementation
+### Chat Flow
 
-**Run Tests (Token Tracking)**
-- Runs token tracking tests specifically
-- **Best for**: Debugging token calculation logic
+Set breakpoints in `engine.py` around the `/api/chat` endpoint:
 
-#### Advanced
-
-**Debug Current File**
-- Runs the currently open Python file
-- **Best for**: Quick script testing
-
-**Pipeline Graph (Step Through)**
-- Runs pipeline with `stopOnEntry: true`
-- **Best for**: Understanding execution flow from the start
-- Execution pauses immediately at first line
-
-### Configuration Summary Table
-
-| # | Config Name | Purpose |
-|---|-------------|---------|
-| 1 | Interactive Menu | Main CLI menu with all options |
-| 2 | Run Once (Mock Issue 001) | API Rate Limiting |
-| 3 | Run Once (Mock Issue 002) | User Authentication |
-| 4 | Run Once (Mock Issue 003) | Data Export |
-| 5 | Run Once (Mock Issue 004) | Dashboard Performance |
-| 6 | Run Once (Mock Issue 005) | Email Notifications |
-| 7 | Run Once (Mock Issue 006) | Search Functionality |
-| 8 | Folder Watcher | Watch incoming/ for files |
-| 9 | MCP Server | Start MCP server |
-| 10 | Run Tests (All) | All pytest tests |
-| 11 | Run Tests (Token Tracking) | Token tracking tests |
-| 12 | Debug Current File | Debug open file |
-| 13 | Pipeline Graph (Step Through) | Step-by-step debugging |
-
-## Debugging Tips
-
-### Understanding Data Flow
-
-1. **Pipeline State Flow**
-   ```python
-   # Set breakpoints at these key points:
-   oreilly-agent-mvp/src/agent_mvp/pipeline/graph.py
-   - Line ~60: load_issue_node (issue loaded)
-   - Line ~100: pm_node (PM analysis)
-   - Line ~170: dev_node (Dev implementation)
-   - Line ~240: qa_node (QA review)
-   - Line ~300: finalize_node (result creation)
-   ```
-
-2. **Token Tracking Flow**
-   ```python
-   # Watch token accumulation:
-   oreilly-agent-mvp/src/agent_mvp/pipeline/graph.py
-   - After each llm.invoke() call (see token extraction)
-   - In finalize_node (see aggregation)
-
-   oreilly-agent-mvp/src/agent_mvp/util/token_tracking.py
-   - Line ~40: extract_token_usage (token capture)
-   - Line ~90: calculate_cost (pricing calculation)
-   - Line ~130: aggregate_pipeline_tokens (totals)
-   ```
-
-3. **Issue Loading**
-   ```python
-   # Trace issue from file to pipeline:
-   oreilly-agent-mvp/src/agent_mvp/issue_sources/file_issue_source.py
-   - Line ~25: fetch_issue (file read)
-
-   oreilly-agent-mvp/src/agent_mvp/pipeline/run_once.py
-   - Line ~60: run_pipeline (entry point)
-   ```
+1. Load session history from `data/chat_sessions/{session_id}.json`.
+2. Build transcript (last 20 turns).
+3. `ChatConciergeAgent` CrewAI kickoff with `query_hr_policy` tool.
+4. Save updated history, return reply + suggestions.
 
 ### Inspecting Variables
 
@@ -129,164 +63,83 @@ When stopped at a breakpoint:
 
 1. **Debug Console** (`Ctrl+Shift+Y`)
    ```python
-   # Evaluate expressions:
-   state["pm_output"]
-   len(state.get("token_usages", []))
-   result.metadata.token_usage.total_tokens
+   state["resume"]
+   state.get("policy_context")
+   state.get("candidate_eval")
+   state.get("hr_decision")
    ```
 
-2. **Variables Pane**
-   - Expand `state` to see pipeline state
-   - Expand `response` to see LLM response
-   - Watch `token_usage` to see per-agent costs
+2. **Variables Pane** -- expand `state` to see pipeline state at any node.
 
 3. **Watch Expressions**
-   - Add: `state.get("token_usages", [])`
-   - Add: `sum(t["usage"]["total_tokens"] for t in state.get("token_usages", []))`
-   - Add: `final_state["result"]["metadata"]["token_usage"]`
+   - `state.keys()` -- see which nodes have populated state
+   - `state.get("error")` -- check for pipeline errors
 
-### Common Breakpoint Locations
+## Ports
 
-#### See Token Usage Build Up
-```python
-# oreilly-agent-mvp/src/agent_mvp/pipeline/graph.py
-# After each agent's llm.invoke() call:
+| Service | Port | Startup |
+|---------|------|---------|
+| FastAPI Engine | 8080 | `uv run hr-engine` |
+| FastMCP 2 SSE | 8081 | `uv run hr-mcp` |
 
-def pm_node(state: PipelineState) -> PipelineState:
-    # ...
-    response = llm.invoke([...])
-    token_usage = extract_token_usage(response, config.llm_model)  # <-- BREAKPOINT HERE
-    # Inspect: token_usage.input_tokens, token_usage.output_tokens
-```
-
-#### See Agent Outputs
-```python
-# Right before returning from each node:
-
-def pm_node(state: PipelineState) -> PipelineState:
-    # ...
-    pm_output = PMOutput(**pm_data)
-    # <-- BREAKPOINT HERE
-    return {**state, "pm_output": pm_output.model_dump()}
-    # Inspect: pm_output.acceptance_criteria, pm_output.plan
-```
-
-#### See Final Aggregation
-```python
-# oreilly-agent-mvp/src/agent_mvp/pipeline/graph.py
-
-def finalize_node(state: PipelineState) -> PipelineState:
-    # ...
-    pipeline_tokens = aggregate_pipeline_tokens(agent_tokens_list)  # <-- BREAKPOINT HERE
-    # Inspect: pipeline_tokens.total_tokens, pipeline_tokens.cost_breakdown
-```
-
-### Step-Through Workflow
-
-1. **Start with "Pipeline Graph (Step Through)"**
-   - Execution pauses at first line
-   - Press `F10` (Step Over) to go line-by-line
-   - Press `F11` (Step Into) to enter function calls
-   - Press `Shift+F11` (Step Out) to exit current function
-   - Press `F5` (Continue) to run to next breakpoint
-
-2. **Watch the State Build**
-   - Add watch: `state.keys()`
-   - Step through and see: `issue` -> `pm_output` -> `dev_output` -> `qa_output` -> `result`
-   - When `result` exists, inspect `result["pm"]`, `result["dev"]`, and `result["qa"]` for the final outputs and `pass|fail|needs-human` verdict
-
-3. **Inspect Token Costs**
-   - Watch `state["token_usages"]` grow with each agent
-   - See cost calculated in real-time
+Both services call `force_kill_port()` on startup to claim their port.
 
 ## Investigation Scenarios
 
-### Scenario 1: Why is this agent using so many tokens?
+### Scenario 1: Resume evaluation produces unexpected disposition
 
-1. Run: **Run Once (Mock Issue 001)**
-2. Set breakpoint in `pm_node()` after `response = llm.invoke(...)`
-3. Inspect:
-   - `prompt` variable (input length)
-   - `token_usage.input_tokens` (actual input count)
-   - `token_usage.output_tokens` (response length)
-4. Compare to other agents
+1. Start `hr-engine` with debugger.
+2. Set breakpoints at the start of each crew node in `graph.py`.
+3. Upload a resume via the web UI (`http://localhost:8080`).
+4. Step through each agent's `crew.kickoff()` call.
+5. Inspect `result.raw` to see the raw LLM output before JSON extraction.
 
-### Scenario 2: How is the pipeline state flowing?
+### Scenario 2: ChromaDB retrieval returns irrelevant chunks
 
-1. Run: **Pipeline Graph (Step Through)**
-2. Add watch: `state`
-3. Step through each node (F10)
-4. See state grow: issue -> pm -> dev -> qa -> result
+1. Set breakpoint in `knowledge/retriever.py` at `query_policy_knowledge()`.
+2. Inspect `question` (the query sent) and the returned `PolicyContext.chunks`.
+3. Check ChromaDB seeding: `uv run hr-seed --reset` to re-ingest all knowledge docs.
 
-### Scenario 3: Testing token cost accuracy
+### Scenario 3: Chat concierge loses context
 
-1. Run: **Run Tests (Token Tracking)**
-2. Set breakpoint in `test_calculate_cost_claude_sonnet`
-3. Step through `calculate_cost()` function
-4. Verify pricing lookup and calculation
+1. Set breakpoint in `engine.py` at the `/api/chat` handler.
+2. Inspect `session_history` -- how many turns are loaded.
+3. Check `data/chat_sessions/{session_id}.json` on disk.
+4. Verify transcript truncation (last 20 turns).
 
-### Scenario 4: End-to-end with real data
+### Scenario 4: MCP Inspector not connecting
 
-1. Run: **Interactive Menu**
-2. Select option 2 (Load mock issue)
-3. Choose any issue (001-006)
-4. Watch console for token summary
-5. Check `oreilly-agent-mvp/outgoing/` for JSON result and HTML report
-
-### Scenario 5: Testing all mock issues
-
-1. Run each **Run Once (Mock Issue 001-006)** config in sequence
-2. Compare token usage across different issue types
-3. Check `oreilly-agent-mvp/outgoing/` for all results
+1. Ensure MCP server is running: `uv run hr-mcp` (port 8081).
+2. Open `http://localhost:8081/sse` in browser -- should see SSE stream.
+3. Run inspector: `npx @modelcontextprotocol/inspector http://localhost:8081/sse`.
 
 ## Key Files for Debugging
 
 ```
-oreilly-agent-mvp/src/agent_mvp/
+contoso-hr-agent/src/contoso_hr/
 |-- pipeline/
-|   |-- graph.py          # Main pipeline orchestration (SET BREAKPOINTS HERE)
-|   |-- run_once.py       # Entry point for CLI runs
-|   |-- crew.py           # CrewAI agent definitions
-|   +-- prompts.py        # Prompt templates (if modifying prompts)
+|   |-- graph.py          # LangGraph StateGraph, 5 nodes, parallel fan-out
+|   |-- agents.py         # 4 CrewAI agent classes
+|   |-- tasks.py          # CrewAI Task factories
+|   |-- tools.py          # query_hr_policy + brave_web_search
+|   +-- prompts.py        # System prompts for all agents
 |
-|-- util/
-|   |-- token_tracking.py # Token calculation logic (SET BREAKPOINTS HERE)
-|   +-- html_report.py    # HTML report generation
+|-- knowledge/
+|   |-- vectorizer.py     # Ingest policy docs -> ChromaDB
+|   +-- retriever.py      # Semantic retrieval from ChromaDB
 |
-|-- models.py             # Data models (inspect structure)
-|-- config.py             # Configuration loading
+|-- memory/
+|   |-- sqlite_store.py   # candidates + evaluations tables
+|   +-- checkpoints.py    # LangGraph SqliteSaver
 |
-+-- cli/
-    +-- interactive_menu.py  # Menu system (for testing flows)
+|-- engine.py             # FastAPI app, REST endpoints, chat
+|-- models.py             # Pydantic v2 data models
+|-- config.py             # Azure AI Foundry configuration
++-- mcp_server/
+    +-- server.py         # FastMCP 2 SSE server
 ```
 
-## VSCode Features to Use
-
-### Debug Console Commands
-```python
-# While stopped at breakpoint:
-dir(state)                          # See all state keys
-state["issue"]["title"]             # Get issue title
-len(state.get("token_usages", []))  # Count agents processed
-import json; print(json.dumps(state["pm_output"], indent=2))  # Pretty print
-```
-
-### Call Stack
-- See how you got to current line
-- Click frames to jump to different stack levels
-- Understand execution flow
-
-### Conditional Breakpoints
-- Right-click breakpoint -> Edit Breakpoint
-- Add condition: `token_usage.total_tokens > 5000`
-- Only stops when condition is true
-
-### Logpoints
-- Right-click gutter -> Add Logpoint
-- Message: `PM tokens: {token_usage.total_tokens}`
-- Logs without stopping execution
-
-## Quick Reference
+## VSCode Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
@@ -297,37 +150,22 @@ import json; print(json.dumps(state["pm_output"], indent=2))  # Pretty print
 | `Shift+F11` | Step out (exit function) |
 | `Ctrl+Shift+F5` | Restart debugging |
 | `Shift+F5` | Stop debugging |
-| `Ctrl+K Ctrl+I` | Show hover info |
-
-## Pro Tips
-
-1. **Use the "Pipeline Graph (Step Through)" config first** - Understand execution flow
-2. **Set breakpoints in all three agent nodes** - See how state builds
-3. **Watch `state["token_usages"]`** - See token accumulation in real-time
-4. **Inspect `final_state["result"]`** - See complete output before JSON write
-5. **Use conditional breakpoints for high token usage** - Catch expensive calls
-6. **Enable "Break on Exception"** - Catch errors immediately (Debug sidebar -> Breakpoints -> Check "Raised Exceptions")
-7. **Try different mock issues** - Each has different characteristics (001-006)
 
 ## Troubleshooting
 
 ### "Module not found" errors
-The launch configurations automatically set `PYTHONPATH` to `${workspaceFolder}/oreilly-agent-mvp/src`. Make sure you opened `agents2/` (not `oreilly-agent-mvp/`) in VSCode.
+Ensure PYTHONPATH includes `contoso-hr-agent/src`. The launch configurations should set this automatically.
 
 ### Unicode/encoding errors on Windows
-The configurations include `PYTHONIOENCODING: utf-8` to handle Rich console output. If you still see encoding errors, ensure you're using the provided launch configs.
+The configurations include `PYTHONIOENCODING: utf-8`. If you still see encoding errors, ensure you are using the provided launch configs.
 
 ### Breakpoint not hit
-- Check `justMyCode: false` in launch.json (already set)
-- Ensure file is actually executed
-- Try `stopOnEntry: true` to start from beginning
-
-## Further Reading
-
-- [VSCode Python Debugging](https://code.visualstudio.com/docs/python/debugging)
-- [Debugpy Documentation](https://github.com/microsoft/debugpy)
-- [LangGraph State Inspection](https://langchain-ai.github.io/langgraph/concepts/low_level/#state)
+- Check `justMyCode: false` in launch.json.
+- Ensure the file is actually executed in the current run configuration.
+- Try `stopOnEntry: true` to start from the beginning.
 
 ---
 
-**Happy Debugging!**
+**Further Reading:**
+- [VSCode Python Debugging](https://code.visualstudio.com/docs/python/debugging)
+- [LangGraph State Inspection](https://langchain-ai.github.io/langgraph/concepts/low_level/#state)

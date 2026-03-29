@@ -9,7 +9,7 @@ An O'Reilly training demo showing production AI agent patterns through a realist
 | **(a) Interactive chat** | Web chat UI + FastAPI `/api/chat` backed by ChatConciergeAgent ("Alex") with ChromaDB-grounded policy retrieval |
 | **(b) Event-driven autonomy** | `ResumeWatcher` polls `data/incoming/` every 3 s -- drop a resume, the 3-agent pipeline runs automatically |
 | **(c) Memory and state** | LangGraph `SqliteSaver` checkpoints + SQLite candidate store + two-layer chat history (localStorage + server JSON) |
-| **(d) Multi-agent reasoning** | LangGraph StateGraph orchestrates 3 CrewAI agents (PolicyExpert, ResumeAnalyst, DecisionMaker) with one `Crew.kickoff()` per node |
+| **(d) Multi-agent reasoning** | LangGraph StateGraph orchestrates 3 CrewAI agents in a parallel fan-out/fan-in pipeline: intake -> [PolicyExpert \|\| ResumeAnalyst] -> DecisionMaker, one `Crew.kickoff()` per node |
 | **(e) Tool use and MCP** | FastMCP 2 server (SSE, port 8081) + `query_hr_policy` tool (ChromaDB) + `brave_web_search` tool (Brave API) |
 
 ## Quick Start
@@ -58,13 +58,20 @@ uv run hr-seed --reset   # clears ChromaDB and re-ingests all policy docs (8 doc
 ./scripts/start.sh
 ```
 
-Open **http://localhost:8080/chat.html** in your browser.
+The engine prints four URIs on startup:
+
+- **Web UI:** <http://localhost:8080/chat.html>
+- **API:** <http://localhost:8080/api>
+- **Docs:** <http://localhost:8080/docs>
+- **MCP SSE:** <http://localhost:8081/sse>
+
+Open the Web UI in your browser. A nav bar across all pages links to **Chat**, **Candidates**, and **Pipeline Runs**.
 
 ## Agent Roster
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#0078D4','primaryTextColor':'#FFFFFF','primaryBorderColor':'#004E8C','lineColor':'#767676','secondaryColor':'#E8E8E8','tertiaryColor':'#F3F2F1'}}}%%
-flowchart LR
+flowchart TD
     subgraph concierge ["Chat Concierge (Alex)"]
         direction TB
         C_ROLE["Role: HR Chat Concierge"]
@@ -73,18 +80,19 @@ flowchart LR
         C_NOTE["verbose=False"]
     end
 
-    subgraph policy ["Policy Expert"]
-        direction TB
-        P_ROLE["Role: HR Policy Expert"]
-        P_TOOL["Tool: query_hr_policy"]
-        P_WHEN["When: pipeline node 2"]
-    end
+    subgraph parallel ["Parallel Fan-Out (pipeline nodes 2-3)"]
+        direction LR
+        subgraph policy ["Policy Expert"]
+            direction TB
+            P_ROLE["Role: HR Policy Expert"]
+            P_TOOL["Tool: query_hr_policy"]
+        end
 
-    subgraph analyst ["Resume Analyst"]
-        direction TB
-        A_ROLE["Role: Sr. Talent Acquisition"]
-        A_TOOL["Tool: brave_web_search"]
-        A_WHEN["When: pipeline node 3"]
+        subgraph analyst ["Resume Analyst"]
+            direction TB
+            A_ROLE["Role: Sr. Talent Acquisition"]
+            A_TOOL["Tool: brave_web_search"]
+        end
     end
 
     subgraph decision ["Decision Maker"]
@@ -94,18 +102,20 @@ flowchart LR
         D_WHEN["When: pipeline node 4"]
     end
 
-    concierge --- policy --- analyst --- decision
+    concierge -.- |"standalone"| concierge
+    policy & analyst --> decision
 
     style concierge fill:#0078D4,stroke:#004E8C,color:#FFFFFF
+    style parallel fill:#F3F2F1,stroke:#767676,color:#000000
     style policy fill:#107C10,stroke:#004E8C,color:#FFFFFF
     style analyst fill:#107C10,stroke:#004E8C,color:#FFFFFF
     style decision fill:#107C10,stroke:#004E8C,color:#FFFFFF
 ```
 
 - **ChatConciergeAgent ("Alex")** -- Handles interactive chat Q&A via `/api/chat`. Uses `query_hr_policy` to ground every policy answer in ChromaDB. Set to `verbose=False` so crew output does not leak into chat responses.
-- **PolicyExpertAgent** -- Pipeline node 2. Retrieves Contoso HR policies from ChromaDB and assesses candidate compliance, recommended level (L1--L5), and compensation band.
-- **ResumeAnalystAgent** -- Pipeline node 3. Scores candidate fit (skills 0--100, experience 0--100) using resume analysis and optional Brave web search for credential verification.
-- **DecisionMakerAgent** -- Pipeline node 4. Pure reasoning over prior agent outputs. Renders one of four dispositions with an overall score and concrete next steps.
+- **PolicyExpertAgent** -- Pipeline node 2 (parallel branch). Retrieves Contoso HR policies from ChromaDB and assesses candidate compliance, recommended level (L1--L5), and compensation band. Runs concurrently with ResumeAnalyst.
+- **ResumeAnalystAgent** -- Pipeline node 3 (parallel branch). Scores candidate fit (skills 0--100, experience 0--100) using resume analysis and optional Brave web search for credential verification. Runs concurrently with PolicyExpert; accepts `Optional[PolicyContext]` and falls back to standard policy text when policy context is unavailable.
+- **DecisionMakerAgent** -- Pipeline node 4 (fan-in). Pure reasoning over prior agent outputs. Waits for both parallel branches to complete, then renders one of four dispositions with an overall score and concrete next steps.
 
 ## Evaluation Pipeline
 
@@ -129,17 +139,23 @@ sequenceDiagram
     W->>LG: process_resume_file()
     LG->>LG: intake node (validate)
 
-    LG->>PE: policy_expert node
-    PE->>CB: query_hr_policy("trainer qualifications")
-    CB-->>PE: policy chunks + sources
-    PE-->>LG: PolicyContext + policy_meta
+    Note over PE,RA: Parallel fan-out from intake
 
-    LG->>RA: resume_analyst node
-    RA->>BS: brave_web_search("verify certs")
-    BS-->>RA: search results JSON
-    RA-->>LG: CandidateEval (scores, strengths, red flags)
+    par policy_expert branch
+        LG->>PE: policy_expert node
+        PE->>CB: query_hr_policy("trainer qualifications")
+        CB-->>PE: policy chunks + sources
+        PE-->>LG: PolicyContext + policy_meta (partial state)
+    and resume_analyst branch
+        LG->>RA: resume_analyst node
+        RA->>BS: brave_web_search("verify certs")
+        BS-->>RA: search results JSON
+        RA-->>LG: CandidateEval (partial state)
+    end
 
-    LG->>DM: decision_maker node
+    Note over LG: Fan-in: merge partial states
+
+    LG->>DM: decision_maker node (waits for both branches)
     DM-->>LG: HRDecision (disposition + reasoning)
 
     LG->>LG: notify node (assemble result)
@@ -169,17 +185,18 @@ Open `http://localhost:8080/chat.html` and ask policy questions:
 - "What is the salary band for a Level 3 trainer?"
 - "How does the interview process work?"
 
-Alex retrieves answers from the ChromaDB knowledge base (8 docs, 146 chunks) using the `query_hr_policy` tool.
+Alex retrieves answers from the ChromaDB knowledge base (8 docs, 146 chunks) using the `query_hr_policy` tool. Six suggestion buttons appear on initial load for quick-start topics.
+
+**Session management:** The chat UI includes a "New chat" button (resets the UI in-place with a new session ID, no page reload) and a "Clear history" button (wipes the current session only). A **Past Sessions** panel in the right sidebar lists previous conversations (fetched via `GET /api/chat/sessions`). Click any past session to switch context. The last 6 turns from the last 2 past sessions are injected into the ChatConcierge task prompt for cross-session continuity.
 
 ### 2. Upload a Resume
 
 Click the upload area in the chat UI and upload any resume from `sample_resumes/` (for example, `RESUME_Sarah_Chen_AZ-104_Trainer-v3.txt`). The pipeline runs automatically:
 
 1. **intake** -- validates the ResumeSubmission
-2. **policy_expert** -- ChromaDB policy lookup and compliance assessment
-3. **resume_analyst** -- scores skills and experience, optional Brave web search
-4. **decision_maker** -- renders disposition (Strong Match / Possible Match / Needs Review / Not Qualified)
-5. **notify** -- assembles EvaluationResult, writes to SQLite
+2. **policy_expert** + **resume_analyst** -- run in PARALLEL (fan-out from intake). PolicyExpert queries ChromaDB; ResumeAnalyst scores skills/experience with optional Brave web search. Each returns only its own state keys for safe merge.
+3. **decision_maker** -- fan-in: waits for both branches, then renders disposition (Strong Match / Possible Match / Needs Review / Not Qualified)
+4. **notify** -- assembles EvaluationResult, writes to SQLite
 
 Alternatively, drop any `.txt`, `.md`, `.pdf`, or `.docx` file directly into `data/incoming/` while the watcher is running.
 
@@ -187,13 +204,17 @@ Alternatively, drop any `.txt`, `.md`, `.pdf`, or `.docx` file directly into `da
 
 Open `http://localhost:8080/candidates.html` -- auto-refreshes every 10 seconds. Click any card for the full evaluation detail including scores, strengths, red flags, reasoning, and next steps.
 
-### 4. Observe Memory and Persistence
+### 4. View Pipeline Runs
+
+Open `http://localhost:8080/runs.html` -- the Pipeline Trace viewer. Split-panel layout: the left panel lists all pipeline runs, and the right panel shows a visual trace for the selected run. Parallel branches (policy_expert and resume_analyst) appear side-by-side with a "parallel fan-out" label.
+
+### 5. Observe Memory and Persistence
 
 Each pipeline run uses a stable `thread_id` with LangGraph `SqliteSaver`. Run the same resume twice and the second run finds prior checkpoint state in `data/checkpoints.db`.
 
 Chat history uses two-layer persistence (see Diagram D below). Pipeline results persist in `data/hr.db`.
 
-### 5. Explore the MCP Server
+### 6. Explore the MCP Server
 
 ```bash
 .\scripts\start_mcp.ps1   # Windows
@@ -218,11 +239,14 @@ flowchart TD
     ER["EvaluationResult<br/>---<br/>candidate_id<br/>candidate_name<br/>timestamp_utc"]
 
     CHROMA[("ChromaDB<br/>146 chunks")]
+    BRAVE["Brave Search API"]
     SQLITE[("SQLite<br/>hr.db")]
 
-    RS --> PC
+    RS -->|"parallel fan-out"| PC
+    RS -->|"parallel fan-out"| CE
     CHROMA -.->|"policy chunks"| PC
-    PC --> CE
+    BRAVE -.->|"web results"| CE
+    PC --> HD
     CE --> HD
     HD --> ER
     ER -->|"save_result()"| SQLITE
@@ -233,6 +257,7 @@ flowchart TD
     style HD fill:#50B0F0,stroke:#004E8C,color:#000000
     style ER fill:#0078D4,stroke:#004E8C,color:#FFFFFF
     style CHROMA fill:#107C10,stroke:#004E8C,color:#FFFFFF
+    style BRAVE fill:#C08000,stroke:#C08000,color:#FFFFFF
     style SQLITE fill:#107C10,stroke:#004E8C,color:#FFFFFF
 ```
 
@@ -245,14 +270,22 @@ All models are Pydantic v2 BaseModel classes defined in `src/contoso_hr/models.p
 flowchart LR
     LS["Browser<br/>localStorage<br/>(session_id)"]
     UI["Chat UI<br/>(chat.html)"]
+    SIDEBAR["Past Sessions<br/>panel (sidebar)"]
     API["FastAPI<br/>/api/chat"]
+    SESSIONS_API["GET /api/chat/sessions"]
     ALEX["ChatConciergeAgent<br/>(Alex)"]
     QHP["query_hr_policy<br/>tool"]
     CHROMA[("ChromaDB")]
     JSON["data/chat_sessions/<br/>{session_id}.json"]
+    PAST["Past session context<br/>(last 6 turns from<br/>last 2 sessions)"]
 
     LS <-->|"instant restore<br/>on reload"| UI
+    SIDEBAR -->|"GET sessions list"| SESSIONS_API
+    SESSIONS_API -->|"session list +<br/>preview + count"| SIDEBAR
+    SIDEBAR -->|"click to switch"| UI
     UI -->|"POST {message,<br/>session_id}"| API
+    API -->|"build context"| PAST
+    PAST -->|"inject into<br/>task prompt"| ALEX
     API -->|"Crew.kickoff()"| ALEX
     ALEX -->|"tool call"| QHP
     QHP -->|"semantic search"| CHROMA
@@ -264,20 +297,27 @@ flowchart LR
 
     style LS fill:#E8E8E8,stroke:#767676,color:#000000
     style UI fill:#0078D4,stroke:#004E8C,color:#FFFFFF
+    style SIDEBAR fill:#E8E8E8,stroke:#767676,color:#000000
+    style SESSIONS_API fill:#50B0F0,stroke:#004E8C,color:#000000
     style API fill:#0078D4,stroke:#004E8C,color:#FFFFFF
     style ALEX fill:#50B0F0,stroke:#004E8C,color:#000000
     style QHP fill:#50B0F0,stroke:#004E8C,color:#000000
     style CHROMA fill:#107C10,stroke:#004E8C,color:#FFFFFF
     style JSON fill:#E8E8E8,stroke:#767676,color:#000000
+    style PAST fill:#F3F2F1,stroke:#767676,color:#000000
 ```
 
 Two-layer persistence keeps chat responsive and durable:
 
 - **Client-side:** `localStorage` keyed by `session_id` -- instant restore on page reload, no server round-trip.
 - **Server-side:** JSON files in `data/chat_sessions/{session_id}.json` -- survives browser clears, accessible via API.
+- **Cross-session context:** The last 6 turns from the last 2 past sessions are injected into the ChatConcierge task prompt, giving Alex awareness of recent prior conversations.
+
+**Session management UI:** "New chat" resets the UI in-place with a fresh session ID (no reload). "Clear history" wipes the current session only. The Past Sessions sidebar panel lists all previous sessions with message count, preview, and timestamp.
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
+| `/api/chat/sessions` | GET | List all chat sessions with message count, preview, and timestamp |
 | `/api/chat/history/{session_id}` | GET | Retrieve persisted chat history for a session |
 | `/api/chat/history/{session_id}` | DELETE | Clear persisted chat history for a session |
 
@@ -314,9 +354,10 @@ contoso-hr-agent/
 │   ├── config.py              # Config dataclass, Azure AI Foundry LLM/embeddings
 │   ├── models.py              # Pydantic v2 data contracts (full model chain)
 │   └── logging_setup.py       # Rich-based structured logging
-├── web/                       # HTML/JS/CSS frontend
-│   ├── chat.html / chat.js    # Chat UI with upload widget
+├── web/                       # HTML/JS/CSS frontend (nav bar across all pages)
+│   ├── chat.html / chat.js    # Chat UI with upload, session mgmt, past sessions
 │   ├── candidates.html / .js  # Candidate results grid (auto-refresh)
+│   ├── runs.html / runs.js    # Pipeline Trace viewer (split-panel, parallel viz)
 │   └── style.css              # Shared styles
 ├── data/                      # Runtime data (gitignored)
 │   ├── incoming/              # Resume drop folder (watched)
@@ -345,6 +386,7 @@ contoso-hr-agent/
 | `/api/candidates` | GET | List evaluated candidates. Query params: `limit` (default 50), `decision` (filter). Returns `CandidateSummary[]`. |
 | `/api/candidates/{id}` | GET | Full `EvaluationResult` for one candidate. 404 if not found. |
 | `/api/stats` | GET | Aggregate statistics: total evaluations, decision breakdown, average score, average duration. |
+| `/api/chat/sessions` | GET | List all chat sessions with message count, preview, and timestamp. |
 | `/api/chat/history/{session_id}` | GET | Retrieve persisted chat history for a session. |
 | `/api/chat/history/{session_id}` | DELETE | Clear persisted chat history for a session. |
 | `/api/health` | GET | Health check. Returns `{status: "ok"}`. |

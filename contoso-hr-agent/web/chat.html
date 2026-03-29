@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contoso HR Assistant</title>
+  <title>Contoso HR Agent</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -68,10 +68,10 @@
     }
     .chat-input:focus { border-color: var(--contoso-blue); }
 
-    /* Session clear link — subtle, below input */
+    /* Session controls — subtle row below input */
     .session-actions {
       padding: 4px 24px 10px;
-      display: flex; gap: 16px;
+      display: flex; gap: 16px; align-items: center;
     }
     .session-action-btn {
       background: none; border: none; padding: 0;
@@ -80,6 +80,39 @@
       transition: color 0.15s;
     }
     .session-action-btn:hover { color: var(--contoso-blue); }
+
+    /* Past sessions list */
+    .past-sessions { padding: 12px 20px 0; }
+    .past-sessions h3 {
+      font-size: 11px; font-weight: 600;
+      color: var(--contoso-gray-dark);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .session-item {
+      padding: 8px 10px; border-radius: var(--radius);
+      border: 1px solid var(--border); margin-bottom: 6px;
+      cursor: pointer; transition: background 0.15s; position: relative;
+    }
+    .session-item:hover { background: var(--contoso-blue-light); }
+    .session-item.active {
+      border-color: var(--contoso-blue);
+      background: var(--contoso-blue-light);
+      cursor: default;
+    }
+    .session-item-preview {
+      font-size: 12px; color: #333; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; padding-right: 48px;
+    }
+    .session-item-meta {
+      display: flex; gap: 8px; margin-top: 3px;
+      font-size: 10px; color: var(--contoso-gray-dark);
+    }
+    .session-item-badge {
+      position: absolute; top: 8px; right: 8px;
+      font-size: 9px; font-weight: 600;
+      background: var(--contoso-blue); color: white;
+      padding: 1px 5px; border-radius: 8px; text-transform: uppercase;
+    }
 
     /* ---- Upload panel ---- */
     .upload-panel {
@@ -150,6 +183,7 @@
     <nav class="header-nav">
       <a href="chat.html" class="active">Chat</a>
       <a href="candidates.html">Candidates</a>
+      <a href="runs.html">Pipeline Runs</a>
     </nav>
   </header>
 
@@ -161,7 +195,7 @@
           <div class="msg-avatar">HR</div>
           <div>
             <div class="msg-bubble">
-              👋 Hi! I'm the <strong>Contoso HR Assistant</strong>.<br><br>
+              👋 Hi! I'm the <strong>Contoso HR Agent</strong>.<br><br>
               I help evaluate <strong>technical trainer candidates</strong> for Azure, M365, and Security courses.<br><br>
               I can:<br>
               • <strong>Evaluate resumes</strong> — upload a trainer CV using the panel →<br>
@@ -178,6 +212,9 @@
         <button class="suggestion-btn" onclick="sendSuggestion(this)">Is MCT required for trainer roles?</button>
         <button class="suggestion-btn" onclick="sendSuggestion(this)">What Azure certs does Contoso value?</button>
         <button class="suggestion-btn" onclick="sendSuggestion(this)">How does the evaluation pipeline work?</button>
+        <button class="suggestion-btn" onclick="sendSuggestion(this)">What makes a Strong Match candidate?</button>
+        <button class="suggestion-btn" onclick="sendSuggestion(this)">How do I submit a resume for evaluation?</button>
+        <button class="suggestion-btn" onclick="sendSuggestion(this)">What is Contoso's EEO policy?</button>
       </div>
 
       <div class="chat-input-bar">
@@ -193,8 +230,9 @@
       </div>
 
       <div class="session-actions">
-        <button class="session-action-btn" onclick="confirmClearHistory()">Clear chat history</button>
-        <span style="font-size:11px;color:var(--contoso-gray-dark)">Session: <span id="session-id-label" style="font-family:monospace"></span></span>
+        <button class="session-action-btn" onclick="confirmClearHistory()">Clear history</button>
+        <button class="session-action-btn" onclick="newSession()">New chat</button>
+        <span style="font-size:11px;color:var(--contoso-gray-dark);margin-left:auto">Session: <span id="session-id-label" style="font-family:monospace"></span></span>
       </div>
     </div>
 
@@ -226,6 +264,12 @@
         <div id="recent-uploads-list"></div>
       </div>
 
+      <!-- ── Past Sessions ── -->
+      <div class="past-sessions" id="past-sessions-section" style="display:none">
+        <h3>Past Sessions</h3>
+        <div id="past-sessions-list"></div>
+      </div>
+
       <!-- ── Panel footer: Candidates button ── -->
       <div class="panel-footer">
         <a href="candidates.html" class="candidates-btn">
@@ -241,9 +285,9 @@
     document.getElementById('session-id-label').textContent = sessionId;
 
     function confirmClearHistory() {
-      if (confirm('Clear chat history and start a new session?')) {
+      if (confirm('Clear chat history for this session?')) {
         clearHistory();
-        location.reload();
+        newSession();
       }
     }
   </script>
