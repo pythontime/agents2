@@ -58,6 +58,51 @@ uv run ruff format src/ tests/      # Format (line length 100)
 
 ## Architecture
 
+### Repository Overview
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#0078D4','primaryTextColor':'#FFFFFF','primaryBorderColor':'#004E8C','lineColor':'#767676','secondaryColor':'#E8E8E8','tertiaryColor':'#F3F2F1'}}}%%
+flowchart TD
+    subgraph REPO["agents2/"]
+        direction TB
+        subgraph CONTOSO["contoso-hr-agent/ &lt;primary&gt;"]
+            style CONTOSO fill:#0078D4,color:#FFFFFF,stroke:#004E8C
+            PIPELINE["pipeline/<br/>graph.py  agents.py  tasks.py  tools.py  prompts.py"]
+            KNOWLEDGE["knowledge/<br/>vectorizer.py  retriever.py"]
+            WATCHER["watcher/<br/>resume_watcher.py  process_resume.py"]
+            MEMORY["memory/<br/>sqlite_store.py  checkpoints.py"]
+            MCP["mcp_server/<br/>server.py"]
+            ENGINE["engine.py<br/>FastAPI :8080"]
+            WEB["web/<br/>chat.html  candidates.html"]
+        end
+        LEGACY["oreilly-agent-mvp/<br/>legacy reference"]
+        style LEGACY fill:#E8E8E8,color:#767676,stroke:#767676
+        DOCS["docs/ + images/<br/>course materials"]
+        style DOCS fill:#F3F2F1,color:#767676,stroke:#767676
+    end
+
+    AZURE["Azure AI Foundry<br/>gpt-4-1-mini + text-embedding-3-large"]
+    style AZURE fill:#50B0F0,color:#004E8C,stroke:#004E8C
+    CHROMADB[("ChromaDB<br/>local")]
+    style CHROMADB fill:#107C10,color:#FFFFFF,stroke:#107C10
+    SQLITE[("SQLite<br/>hr.db + checkpoints.db")]
+    style SQLITE fill:#107C10,color:#FFFFFF,stroke:#107C10
+    BRAVE["Brave Search API"]
+    style BRAVE fill:#C08000,color:#FFFFFF,stroke:#C08000
+
+    ENGINE --> PIPELINE
+    PIPELINE --> KNOWLEDGE
+    PIPELINE --> MEMORY
+    WATCHER --> PIPELINE
+    MCP --> MEMORY
+    MCP --> KNOWLEDGE
+    KNOWLEDGE --> CHROMADB
+    MEMORY --> SQLITE
+    PIPELINE --> AZURE
+    PIPELINE --> BRAVE
+    KNOWLEDGE --> AZURE
+```
+
 ### Pipeline Flow (5 nodes)
 
 ```
@@ -70,8 +115,18 @@ LangGraph StateGraph  (pipeline/graph.py, SqliteSaver checkpoints)
   [decision_maker]  → CrewAI Crew: DecisionMakerAgent (pure reasoning, no tools)
   [notify]          → assemble EvaluationResult, log Rich summary
     ↓
-data/outgoing/{candidate_id}_{ts}.json  +  data/hr.db  +  data/checkpoints.db
+data/outgoing/{candidate_id}_{ts}.json  +  data/hr.db  +  data/checkpoints.db  +  data/chat_sessions/{session_id}.json
 ```
+
+**Four CrewAI Agents:**
+1. **ChatConciergeAgent ("Alex")** -- interactive HR policy Q&A via `/api/chat`, tools: `[query_hr_policy]`
+2. **PolicyExpertAgent** -- pipeline node 2, assesses resume against HR policy, tools: `[query_hr_policy]`
+3. **ResumeAnalystAgent** -- pipeline node 3, scores candidate fit with optional web research, tools: `[brave_web_search]`
+4. **DecisionMakerAgent** -- pipeline node 4, renders final disposition, no tools (pure reasoning)
+
+**Four Dispositions:** Strong Match | Possible Match | Needs Review | Not Qualified
+
+**Chat Memory:** Two-layer pattern -- `localStorage` in browser for instant restore, JSON files in `data/chat_sessions/{session_id}.json` for persistence across browser clears. The last 20 turns are included as transcript context in each concierge task prompt.
 
 **CrewAI + LangGraph coupling:** Each `*_crew_node` creates a `Crew(agents=[one_agent], tasks=[one_task], process=Process.sequential)` and calls `crew.kickoff()`. LangGraph owns routing/state/persistence; CrewAI owns persona execution.
 
@@ -80,7 +135,7 @@ data/outgoing/{candidate_id}_{ts}.json  +  data/hr.db  +  data/checkpoints.db
 | Path | Purpose |
 |------|---------|
 | `src/contoso_hr/pipeline/graph.py` | LangGraph StateGraph, HRState TypedDict, all 5 node functions, `create_hr_graph()` |
-| `src/contoso_hr/pipeline/agents.py` | PolicyExpertAgent, ResumeAnalystAgent, DecisionMakerAgent (CrewAI) |
+| `src/contoso_hr/pipeline/agents.py` | ChatConciergeAgent ("Alex"), PolicyExpertAgent, ResumeAnalystAgent, DecisionMakerAgent (CrewAI) |
 | `src/contoso_hr/pipeline/tasks.py` | CrewAI Task factories (inject prior state into task descriptions) |
 | `src/contoso_hr/pipeline/tools.py` | `@tool query_hr_policy` (ChromaDB) + `@tool brave_web_search` (Brave API) |
 | `src/contoso_hr/pipeline/prompts.py` | Agent system prompts |
@@ -101,7 +156,7 @@ data/outgoing/{candidate_id}_{ts}.json  +  data/hr.db  +  data/checkpoints.db
 ResumeSubmission (input)
   → PolicyContext     (ChromaDB retrieval result)
   → CandidateEval     (skills_match_score, experience_score, strengths, red_flags)
-  → HRDecision        (decision: advance|hold|reject, reasoning, next_steps, overall_score)
+  → HRDecision        (decision: Strong Match|Possible Match|Needs Review|Not Qualified, reasoning, next_steps, overall_score)
   → EvaluationResult  (final — written to SQLite + served by API)
 ```
 

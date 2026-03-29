@@ -40,54 +40,86 @@ Key evaluation signals: MCT status, Azure/M365/Security certs (AZ-104, AZ-305, A
 training delivery volume + learner satisfaction (4.5+/5.0), curriculum development experience.
 
 Sample resumes in `sample_resumes/` use the `RESUME_*.txt` naming convention (13 files covering excellent/mid/poor MCT trainer matches).
-Knowledge docs in `sample_knowledge/` include PDFs, .docx, .pptx, and .md files. The vectorizer explicitly excludes `Contoso-HR-Policy.doc` (old binary format, replaced by -v2.docx) and `Copilot-Studio-HR-Scenario.pptx` (product deployment guide, not HR policy).
+Knowledge docs in `sample_knowledge/` include PDFs, .docx, .pptx, and .md files. The vectorizer explicitly excludes `Contoso-HR-Policy.doc` (old binary format, replaced by -v2.docx) and `Copilot-Studio-HR-Scenario.pptx` (product deployment guide, not HR policy). Result: 8 docs, 146 chunks in ChromaDB.
 
 ## Architecture
 
-### Pipeline Flow (5 nodes)
+### Pipeline Flow (5 LangGraph nodes)
 
 ```
-Resume file (.txt, .md, .pdf, .docx — drop or web upload)
-    ↓
+Resume file (.txt, .md, .pdf, .docx -- drop or web upload)
+    |
 LangGraph StateGraph  (pipeline/graph.py, SqliteSaver checkpoints)
-  [intake]          → validate ResumeSubmission
-  [policy_expert]   → CrewAI Crew: PolicyExpertAgent + query_hr_policy tool (ChromaDB)
-  [resume_analyst]  → CrewAI Crew: ResumeAnalystAgent + brave_web_search tool
-  [decision_maker]  → CrewAI Crew: DecisionMakerAgent (pure reasoning, no tools)
-  [notify]          → assemble EvaluationResult, log Rich summary
-    ↓
+  [intake]          -> validate ResumeSubmission
+  [policy_expert]   -> CrewAI Crew: PolicyExpertAgent + query_hr_policy tool (ChromaDB)
+  [resume_analyst]  -> CrewAI Crew: ResumeAnalystAgent + brave_web_search tool
+  [decision_maker]  -> CrewAI Crew: DecisionMakerAgent (pure reasoning, no tools)
+  [notify]          -> assemble EvaluationResult, log Rich summary
+    |
 data/outgoing/{candidate_id}_{ts}.json  +  data/hr.db  +  data/checkpoints.db  +  data/chat_sessions/{session_id}.json
 ```
 
 **CrewAI + LangGraph coupling:** Each `*_crew_node` creates a `Crew(agents=[one_agent], tasks=[one_task], process=Process.sequential)` and calls `crew.kickoff()`. LangGraph owns routing/state/persistence; CrewAI owns persona execution. This pattern is from `oreilly-agent-mvp/src/agent_mvp/pipeline/crew_variant/graph.py`.
+
+### Four Agents
+
+| Agent Class | Persona | Tools | Invocation | verbose |
+|-------------|---------|-------|------------|---------|
+| `ChatConciergeAgent` | "Alex" -- HR Chat Concierge | `query_hr_policy` (ChromaDB) | `/api/chat` endpoint in `engine.py` | `False` |
+| `PolicyExpertAgent` | HR Policy Expert | `query_hr_policy` (ChromaDB) | Pipeline node 2 (`policy_expert_crew_node`) | `True` |
+| `ResumeAnalystAgent` | Sr. Talent Acquisition Specialist | `brave_web_search` (Brave API) | Pipeline node 3 (`resume_analyst_crew_node`) | `True` |
+| `DecisionMakerAgent` | Hiring Committee Chair | None (pure reasoning) | Pipeline node 4 (`decision_maker_crew_node`) | `True` |
+
+### Four Dispositions
+
+The DecisionMaker renders exactly one of these for each candidate:
+
+| Disposition | Score Range | Next Step |
+|-------------|------------|-----------|
+| **Strong Match** | 80+ | Schedule interview immediately |
+| **Possible Match** | 55--79 | Schedule technical screen |
+| **Needs Review** | 35--54 | Recruiter follow-up before deciding |
+| **Not Qualified** | below 35 | Decline with courtesy |
+
+These are enforced as a `Literal` type in `HRDecision.decision` in `models.py`.
+
+### Diagrams
+
+See `README.md` for four Mermaid diagrams:
+- **Diagram A** (Agent Roster) -- flowchart showing all four agents with tools and invocation context
+- **Diagram B** (Evaluation Pipeline) -- sequenceDiagram of full file-drop-to-result flow
+- **Diagram C** (Data Model Chain) -- flowchart of Pydantic model progression with ChromaDB/SQLite
+- **Diagram D** (Chat Memory Architecture) -- flowchart of two-layer chat persistence
 
 ### Key Files
 
 | Path | Purpose |
 |------|---------|
 | `src/contoso_hr/pipeline/graph.py` | LangGraph StateGraph, HRState TypedDict, all 5 node functions, `create_hr_graph()` |
-| `src/contoso_hr/pipeline/agents.py` | PolicyExpertAgent, ResumeAnalystAgent, DecisionMakerAgent (CrewAI) |
+| `src/contoso_hr/pipeline/agents.py` | ChatConciergeAgent, PolicyExpertAgent, ResumeAnalystAgent, DecisionMakerAgent (CrewAI) |
 | `src/contoso_hr/pipeline/tasks.py` | CrewAI Task factories (inject prior state into task descriptions) |
 | `src/contoso_hr/pipeline/tools.py` | `@tool query_hr_policy` (ChromaDB) + `@tool brave_web_search` (Brave API) |
+| `src/contoso_hr/pipeline/prompts.py` | System prompts for all 4 agents (persona, evaluation criteria, output format) |
 | `src/contoso_hr/config.py` | Config dataclass, Azure AI Foundry LLM/embeddings factory |
-| `src/contoso_hr/models.py` | Full Pydantic v2 model chain: ResumeSubmission → PolicyContext → CandidateEval → HRDecision → EvaluationResult |
-| `src/contoso_hr/knowledge/vectorizer.py` | Ingest policy docs (.txt/.md/.pdf/.doc/.pptx) → Azure embeddings → ChromaDB |
-| `src/contoso_hr/knowledge/retriever.py` | `query_policy_knowledge(question, k)` → PolicyContext |
+| `src/contoso_hr/models.py` | Full Pydantic v2 model chain: ResumeSubmission -> PolicyContext -> CandidateEval -> HRDecision -> EvaluationResult |
+| `src/contoso_hr/knowledge/vectorizer.py` | Ingest policy docs (.txt/.md/.pdf/.docx/.pptx) -> Azure embeddings -> ChromaDB |
+| `src/contoso_hr/knowledge/retriever.py` | `query_policy_knowledge(question, k)` -> PolicyContext |
 | `src/contoso_hr/memory/sqlite_store.py` | HRSQLiteStore: candidates + evaluations tables |
 | `src/contoso_hr/memory/checkpoints.py` | `get_checkpointer()`, `make_thread_config(session_id)` |
-| `src/contoso_hr/engine.py` | FastAPI: /api/chat, /api/upload, /api/candidates, /api/stats, GET /api/chat/history/{id}, DELETE /api/chat/history/{id} |
-| `src/contoso_hr/watcher/resume_watcher.py` | Polls data/incoming/ for .txt/.md files |
+| `src/contoso_hr/engine.py` | FastAPI: /api/chat, /api/upload, /api/candidates, /api/stats, /api/health, GET/DELETE /api/chat/history/{id} |
+| `src/contoso_hr/watcher/resume_watcher.py` | Polls data/incoming/ for .txt/.md/.pdf/.docx files every 3s |
+| `src/contoso_hr/watcher/process_resume.py` | Runs LangGraph pipeline and saves result to SQLite |
 | `src/contoso_hr/mcp_server/server.py` | FastMCP 2 server (SSE, port 8081) |
-| `src/contoso_hr/util/port_utils.py` | `force_kill_port(port)` — called on every startup |
+| `src/contoso_hr/util/port_utils.py` | `force_kill_port(port)` -- called on every startup |
 
 ### Data Model Chain
 
 ```
 ResumeSubmission (input)
-  → PolicyContext     (ChromaDB retrieval result)
-  → CandidateEval     (skills_match_score, experience_score, strengths, red_flags)
-  → HRDecision        (decision: advance|hold|reject, reasoning, next_steps, overall_score)
-  → EvaluationResult  (final — written to SQLite + served by API)
+  -> PolicyContext     (ChromaDB retrieval result)
+  -> CandidateEval     (skills_match_score, experience_score, strengths, red_flags)
+  -> HRDecision        (decision: Strong Match|Possible Match|Needs Review|Not Qualified, reasoning, next_steps, overall_score)
+  -> EvaluationResult  (final -- written to SQLite + served by API)
 ```
 
 ### LLM Configuration (Azure AI Foundry)
@@ -96,7 +128,7 @@ All LLM calls use `AzureChatOpenAI` (from `langchain-openai`). CrewAI uses `LLM(
 
 Required env vars: `AZURE_AI_FOUNDRY_ENDPOINT`, `AZURE_AI_FOUNDRY_KEY`, `AZURE_AI_FOUNDRY_CHAT_MODEL`, `AZURE_AI_FOUNDRY_EMBEDDING_MODEL`.
 
-Azure deployment: resource `contoso-hr-ai` in resource group `contoso-hr-rg` (eastus2). Deployed models: `gpt-4-1-mini` (chat) and `text-embedding-3-large` (embeddings).
+Azure deployment: resource `contoso-hr-ai` in resource group `contoso-hr-rg` (eastus2). Deployed models: `gpt-4-1-mini` (chat) and `text-embedding-3-large` (embeddings). Endpoint: `https://contoso-hr-ai.cognitiveservices.azure.com/`.
 
 ### Port Management
 
@@ -105,8 +137,8 @@ Azure deployment: resource `contoso-hr-ai` in resource group `contoso-hr-rg` (ea
 ### Chat History Persistence
 
 Two-layer pattern for chat memory:
-- **Client-side:** `localStorage` in the browser — instant restore on page reload, no server round-trip.
-- **Server-side:** JSON files in `data/chat_sessions/{session_id}.json` — survives browser clears, accessible via API.
+- **Client-side:** `localStorage` in the browser -- instant restore on page reload, no server round-trip.
+- **Server-side:** JSON files in `data/chat_sessions/{session_id}.json` -- survives browser clears, accessible via API.
 - `GET /api/chat/history/{session_id}` returns the persisted history; `DELETE` clears it.
 - The Candidates page has a "Back to Chat" link; the Chat page has a "Candidates" button.
 
@@ -119,6 +151,6 @@ SSE transport at `http://localhost:8081/sse`. Tools: `get_candidate`, `list_cand
 - Python 3.11+, `snake_case`, 4-space indent, 100-char line limit
 - Ruff for lint/format: `uv run ruff check src/ tests/`
 - Pydantic v2 for all data models (`model_dump()`, `model_dump_json()`, `model_validate_json()`)
-- One `Crew.kickoff()` per LangGraph node — no nested orchestration
+- One `Crew.kickoff()` per LangGraph node -- no nested orchestration
 - Tests use `tmp_path` fixtures; no live API calls in unit tests
-- `data/` directories are runtime-only — never commit their contents (`data/incoming/`, `data/processed/`, `data/outgoing/`, `data/chroma/`, `data/knowledge/`, `data/chat_sessions/`)
+- `data/` directories are runtime-only -- never commit their contents (`data/incoming/`, `data/processed/`, `data/outgoing/`, `data/chroma/`, `data/knowledge/`, `data/chat_sessions/`)
