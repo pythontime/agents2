@@ -23,7 +23,9 @@
       "mcp__github__issue_write",
       "Bash(npx --version:*)",
       "Bash(sqlite3:*)",
-      "Bash(uv venv:*)"
+      "Bash(uv venv:*)",
+      "Bash(netstat -ano)",
+      "Read(//c/github/agents2/contoso-hr-agent/.venv/Lib/site-packages/fastmcp/**)"
     ]
   }
 }
