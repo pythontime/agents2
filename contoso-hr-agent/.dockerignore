@@ -1,0 +1,39 @@
+# Ignore data directory (runtime-only, ephemeral)
+data/
+
+# Ignore dev/test files
+tests/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+
+# Ignore IDE / OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Ignore git
+.git/
+.gitignore
+
+# Ignore deployment scripts (not needed inside the container)
+deploy/
+scripts/
+
+# Ignore env files (secrets passed via Container Apps secrets)
+.env
+.env.*
+
+# Ignore top-level docs (not needed at runtime)
+# NOTE: README.md must be present — pyproject.toml declares it and hatchling requires it at build time
+CLAUDE.md
+CODE_WALKTHROUGH.md
+
+# Ignore sample resumes (can upload via web UI)
+sample_resumes/
+
+# Ignore uv cache
+.uv/

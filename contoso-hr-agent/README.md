@@ -39,7 +39,7 @@ AZURE_AI_FOUNDRY_KEY=your-api-key
 AZURE_AI_FOUNDRY_CHAT_MODEL=gpt-4-1-mini
 AZURE_AI_FOUNDRY_EMBEDDING_MODEL=text-embedding-3-large
 AZURE_AI_FOUNDRY_API_VERSION=2024-05-01-preview
-BRAVE_API_KEY=your-brave-search-api-key       # optional
+BRAVE_API_KEY=your-brave-search-api-key       # free tier at brave.com/search/api
 ```
 
 Seed the knowledge base:
