@@ -10,7 +10,7 @@ An O'Reilly training demo showing production AI agent patterns through a realist
 | **(b) Event-driven autonomy** | `ResumeWatcher` polls `data/incoming/` every 3 s -- drop a resume, the 3-agent pipeline runs automatically |
 | **(c) Memory and state** | LangGraph `SqliteSaver` checkpoints + SQLite candidate store + two-layer chat history (localStorage + server JSON) |
 | **(d) Multi-agent reasoning** | LangGraph StateGraph orchestrates 3 CrewAI agents in a parallel fan-out/fan-in pipeline: intake -> [PolicyExpert \|\| ResumeAnalyst] -> DecisionMaker, one `Crew.kickoff()` per node |
-| **(e) Tool use and MCP** | FastMCP 2 server (SSE, port 8081) + `query_hr_policy` tool (ChromaDB) + `brave_web_search` tool (Brave API) |
+| **(e) Tool use and MCP** | FastMCP 2 server (stdio + SSE) demonstrating all 5 MCP primitives: tools, resources, resource templates, prompts, sampling (`ctx.sample()`), and elicitation (`ctx.elicit()`) + `query_hr_policy` tool (ChromaDB) + `brave_web_search` tool (Brave API) |
 
 ## Quick Start
 
@@ -58,12 +58,13 @@ uv run hr-seed --reset   # clears ChromaDB and re-ingests all policy docs (8 doc
 ./scripts/start.sh
 ```
 
-The engine prints four URIs on startup:
+The engine prints startup URIs:
 
 - **Web UI:** <http://localhost:8080/chat.html>
 - **API:** <http://localhost:8080/api>
 - **Docs:** <http://localhost:8080/docs>
-- **MCP SSE:** <http://localhost:8081/sse>
+
+On Windows, `start.ps1` also launches the **MCP Inspector** as a background job (stdio transport via `npx @modelcontextprotocol/inspector uv run hr-mcp --stdio`). If Node.js is not installed, the Inspector is skipped with a warning. The script kills any leftover Inspector ports (5173/6274) on startup.
 
 Open the Web UI in your browser. A nav bar across all pages links to **Chat**, **Candidates**, and **Pipeline Runs**.
 
@@ -216,16 +217,19 @@ Chat history uses two-layer persistence (see Diagram D below). Pipeline results 
 
 ### 6. Explore the MCP Server
 
+If you used `start.ps1`, the MCP Inspector is already running in the background (stdio mode). Otherwise, launch it manually:
+
 ```bash
-.\scripts\start_mcp.ps1   # Windows
-./scripts/start_mcp.sh    # Linux/macOS
+npx @modelcontextprotocol/inspector uv run hr-mcp --stdio
 ```
 
-MCP Inspector opens automatically. Try:
+The Inspector UI opens at `http://localhost:6274`. Try:
 
-- `list_candidates` -- see all evaluations
-- `query_policy` with "What is the hiring process?"
-- `trigger_resume_evaluation` with resume text from a sample file
+- **Tools:** `list_candidates` -- see all evaluations; `query_policy` with "What is the hiring process?"; `trigger_resume_evaluation` with resume text from a sample file
+- **Sampling:** `generate_eval_summary` -- the server calls `ctx.sample()` to have the connected LLM write an executive summary for a candidate
+- **Elicitation:** `confirm_and_evaluate` -- the server calls `ctx.elicit()` to present a confirmation form before running the expensive pipeline
+- **Resource templates:** `candidate://{candidate_id}` and `policy://{topic}` -- parameterized resources that return formatted markdown
+- **Prompts:** `disposition_review` -- fetches a candidate from SQLite and formats a review conversation using Context
 
 ## Data Model Chain
 
@@ -343,9 +347,9 @@ contoso-hr-agent/
 │   ├── memory/                # Persistence layer
 │   │   ├── sqlite_store.py    # HRSQLiteStore: candidates + evaluations tables
 │   │   └── checkpoints.py     # LangGraph SqliteSaver wrapper
-│   ├── mcp_server/            # FastMCP 2 (SSE, port 8081)
-│   │   ├── server.py          # Tools, resources, and prompts
-│   │   └── __main__.py        # Entry point (kills port on startup)
+│   ├── mcp_server/            # FastMCP 2 (stdio + SSE)
+│   │   ├── server.py          # All 5 MCP primitives (tools, resources, prompts, sampling, elicitation)
+│   │   └── __main__.py        # Entry point (--stdio flag for Inspector, else SSE on 8081)
 │   ├── util/                  # Utilities
 │   │   ├── port_utils.py      # force_kill_port(port)
 │   │   ├── fs.py              # ensure_dirs()
@@ -419,11 +423,19 @@ Teardown when finished:
 az group delete --name contoso-hr-rg --yes --no-wait
 ```
 
-## MCP Server (FastMCP 2, SSE)
+## MCP Server (FastMCP 2 -- All 5 Primitives)
 
-Port 8081. Connect via MCP Inspector at `http://localhost:5173` with SSE URL `http://localhost:8081/sse`.
+Supports two transports: **stdio** (primary for local dev with MCP Inspector) and **SSE** (port 8081, for programmatic clients).
 
-### Tools
+```bash
+# stdio (recommended for Inspector -- auto-started by start.ps1)
+npx @modelcontextprotocol/inspector uv run hr-mcp --stdio
+
+# SSE (standalone, binds port 8081)
+uv run hr-mcp
+```
+
+### Primitive 1 -- Tools
 
 | Tool | Parameters | Purpose |
 |------|-----------|---------|
@@ -431,8 +443,12 @@ Port 8081. Connect via MCP Inspector at `http://localhost:5173` with SSE URL `ht
 | `list_candidates` | `limit`, `decision_filter` | Recent evaluations (filterable by disposition) |
 | `trigger_resume_evaluation` | `resume_text`, `filename` | Run the full pipeline directly (bypasses watcher) |
 | `query_policy` | `question` | ChromaDB semantic search over HR policy docs |
+| `generate_eval_summary` | `candidate_id` | **Sampling:** calls `ctx.sample()` to have the connected LLM write an executive summary |
+| `confirm_and_evaluate` | `resume_text`, `filename` | **Elicitation:** calls `ctx.elicit()` to present a confirmation form before running the pipeline |
 
-### Resources
+### Primitive 2 -- Resources
+
+**Static resources:**
 
 | URI | Content |
 |-----|---------|
@@ -441,12 +457,28 @@ Port 8081. Connect via MCP Inspector at `http://localhost:5173` with SSE URL `ht
 | `samples://resumes` | List of available sample resume files |
 | `config://settings` | Current application configuration (no secrets) |
 
-### Prompts
+**Parameterized resource templates:**
 
-| Prompt | Parameters | Purpose |
-|--------|-----------|---------|
-| `evaluate_resume` | `resume_text`, `role` (optional) | Structured trainer resume evaluation prompt |
-| `policy_query` | `question` | Structured HR policy query prompt |
+| URI Template | Content |
+|--------------|---------|
+| `candidate://{candidate_id}` | Formatted markdown profile for one evaluated candidate |
+| `policy://{topic}` | HR policy chunks for a topic keyword (semantic search, top 3 results) |
+
+### Primitive 3 -- Prompts
+
+| Prompt | Parameters | Returns | Purpose |
+|--------|-----------|---------|---------|
+| `evaluate_resume` | `resume_text`, `role` (optional) | `list[dict]` (multi-message) | System persona + scoring rubric + assistant primer for structured resume evaluation |
+| `policy_query` | `question` | `list[dict]` (multi-message) | Grounding instruction + policy question as separate user turns |
+| `disposition_review` | `candidate_id` | `list[dict]` (multi-message) | Uses Context to fetch live candidate data from SQLite and format a review conversation |
+
+### Primitive 4 -- Sampling
+
+Used in: `generate_eval_summary` tool. The server sends structured candidate evaluation data to the connected LLM via `ctx.sample()` and receives back a concise 3--5 sentence executive summary suitable for a hiring manager briefing. This inverts the normal flow -- the server drives the LLM, not the other way around.
+
+### Primitive 5 -- Elicitation
+
+Used in: `confirm_and_evaluate` tool. Before running the expensive LangGraph + CrewAI pipeline (30--120 seconds, LLM API calls), the server calls `ctx.elicit()` to pause and present a confirmation form collecting `confirmed` (bool) and `priority` (str). If the user declines or cancels, the pipeline never runs. Requires a client that supports elicitation (MCP Inspector supports it in stdio mode).
 
 ## Remote MCP Servers (.mcp.json)
 

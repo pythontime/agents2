@@ -11,45 +11,26 @@ Write-Host "Checking port 8081..." -ForegroundColor Yellow
 $netstatOutput = netstat -ano 2>$null | Select-String ":8081"
 foreach ($line in $netstatOutput) {
     $parts = $line.ToString().Trim() -split '\s+'
-    $pid = $parts[-1]
-    if ($pid -match '^\d+$' -and $pid -ne '0') {
-        Write-Host "  Killing PID $pid on port 8081" -ForegroundColor Yellow
-        taskkill /PID $pid /F 2>$null | Out-Null
+    $procId = $parts[-1]
+    if ($procId -match '^\d+$' -and $procId -ne '0') {
+        Write-Host "  Killing PID $procId on port 8081" -ForegroundColor Yellow
+        try {
+            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+        } catch {}
+        taskkill /PID $procId /F 2>$null | Out-Null
     }
 }
 Start-Sleep -Milliseconds 500
 
-# Start MCP server as background job
-$mcpJob = Start-Job -ScriptBlock {
-    Set-Location $using:PWD
-    uv run hr-mcp
-}
-Write-Host "[mcp-server] Started (Job ID: $($mcpJob.Id))" -ForegroundColor Green
-Write-Host "  SSE endpoint: http://localhost:8081/sse" -ForegroundColor White
-
-Start-Sleep 2
-
-# Check if npx is available for MCP Inspector
+# MCP Inspector (stdio mode) — Inspector spawns hr-mcp itself, no separate server process needed.
 if (Get-Command npx -ErrorAction SilentlyContinue) {
-    Write-Host "`nLaunching MCP Inspector..." -ForegroundColor Cyan
-    Write-Host "  Connect to: http://localhost:8081/sse" -ForegroundColor White
+    Write-Host "`nLaunching MCP Inspector (stdio mode)..." -ForegroundColor Cyan
+    Write-Host "  Inspector UI will open in your browser automatically." -ForegroundColor White
     Write-Host "  Press Ctrl+C to stop`n" -ForegroundColor White
-    try {
-        npx @modelcontextprotocol/inspector http://localhost:8081/sse
-    } finally {
-        Write-Host "`nStopping MCP server..." -ForegroundColor Yellow
-        Stop-Job $mcpJob -ErrorAction SilentlyContinue
-        Remove-Job $mcpJob -ErrorAction SilentlyContinue
-    }
+    npx @modelcontextprotocol/inspector uv run hr-mcp --stdio
 } else {
     Write-Host "`n[!] npx not found — MCP Inspector not launched." -ForegroundColor Yellow
     Write-Host "    Install Node.js from https://nodejs.org/" -ForegroundColor Yellow
-    Write-Host "    Or connect manually to: http://localhost:8081/sse`n" -ForegroundColor White
-    Write-Host "Press Ctrl+C to stop the MCP server."
-    try {
-        Wait-Job $mcpJob
-    } finally {
-        Stop-Job $mcpJob -ErrorAction SilentlyContinue
-        Remove-Job $mcpJob -ErrorAction SilentlyContinue
-    }
+    Write-Host "`nFalling back to SSE mode on port 8081..." -ForegroundColor Yellow
+    uv run hr-mcp
 }

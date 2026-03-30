@@ -31,19 +31,20 @@ Copy `.env.example` to `.env` and set your Azure AI Foundry credentials:
 ## Build / Run Commands
 
 ```bash
-# Start everything (engine + watcher)
+# Start everything (engine + watcher + MCP Inspector)
 ./scripts/start.sh          # Linux/macOS
-.\scripts\start.ps1         # Windows PowerShell
+.\scripts\start.ps1         # Windows PowerShell (also launches MCP Inspector on ports 5173/6274)
 
 # Start individual services
 uv run hr-engine            # FastAPI on port 8080 (kills port first)
 uv run hr-watcher           # File watcher for data/incoming/
-uv run hr-mcp               # FastMCP 2 server on port 8081 (kills port first)
+uv run hr-mcp               # FastMCP 2 server, SSE on port 8081 (kills port first)
+uv run hr-mcp --stdio       # FastMCP 2 server, stdio transport (for MCP Inspector)
 uv run hr-seed              # Re-seed ChromaDB from sample_knowledge/
 
-# MCP Inspector (requires Node.js)
-./scripts/start_mcp.sh      # Starts MCP server + opens Inspector
-.\scripts\start_mcp.ps1     # Windows
+# MCP Inspector standalone (requires Node.js) — not needed if using start.ps1
+npx @modelcontextprotocol/inspector uv run hr-mcp --stdio
+.\scripts\start_mcp.ps1     # Windows convenience wrapper
 ```
 
 Engine startup prints four URIs: Web UI (8080), API, Docs, MCP SSE (8081).
@@ -181,7 +182,7 @@ All three pages are linked in the navigation bar: **Chat | Candidates | Pipeline
 | `src/contoso_hr/memory/checkpoints.py` | `get_checkpointer()`, `make_thread_config(session_id)` |
 | `src/contoso_hr/engine.py` | FastAPI: all API endpoints, `_build_past_session_context()`, startup URI prints |
 | `src/contoso_hr/watcher/resume_watcher.py` | Polls data/incoming/ for .txt/.md files |
-| `src/contoso_hr/mcp_server/server.py` | FastMCP 2 server (SSE, port 8081) |
+| `src/contoso_hr/mcp_server/server.py` | FastMCP 2 server -- all 5 MCP primitives (SSE :8081 or stdio) |
 | `src/contoso_hr/util/port_utils.py` | `force_kill_port(port)` -- called on every startup |
 
 ### Data Model Chain
@@ -206,7 +207,19 @@ Required env vars: `AZURE_AI_FOUNDRY_ENDPOINT`, `AZURE_AI_FOUNDRY_KEY`, `AZURE_A
 
 ### MCP Server (FastMCP 2)
 
-SSE transport at `http://localhost:8081/sse`. Tools: `get_candidate`, `list_candidates`, `trigger_resume_evaluation`, `query_policy`. Resources: `schema://candidate`, `stats://evaluations`, `samples://resumes`, `config://settings`. Prompts: `evaluate_resume`, `policy_query`.
+Supports SSE transport (`http://localhost:8081/sse`) and stdio (`uv run hr-mcp --stdio`). Implements all five MCP primitives:
+
+**Tools:** `get_candidate`, `list_candidates`, `trigger_resume_evaluation`, `query_policy`, `generate_eval_summary` (sampling -- asks the connected LLM to write an executive summary), `confirm_and_evaluate` (elicitation -- prompts the user to confirm before running the pipeline).
+
+**Static Resources:** `schema://candidate`, `stats://evaluations`, `samples://resumes`, `config://settings`.
+
+**Resource Templates:** `candidate://{candidate_id}` (formatted markdown profile), `policy://{topic}` (semantic search over ChromaDB).
+
+**Prompts:** `evaluate_resume` (multi-message trainer eval), `policy_query` (structured policy Q&A), `disposition_review` (fetch candidate + format for hiring-committee review).
+
+**Sampling (Primitive 4):** Used by `generate_eval_summary` -- the server sends candidate data to the connected LLM via `ctx.sample()` and returns a concise briefing.
+
+**Elicitation (Primitive 5):** Used by `confirm_and_evaluate` -- `ctx.elicit()` pauses the tool, presents a confirmation form to the user, and resumes only on accept.
 
 ## Code Conventions
 

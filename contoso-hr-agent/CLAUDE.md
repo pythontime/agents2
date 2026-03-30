@@ -10,9 +10,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # First-time setup
 uv venv && uv sync && uv run hr-seed      # creates venv, installs deps, seeds ChromaDB
 
-# Start everything (engine + watcher)
+# Start everything (engine + watcher + MCP Inspector)
 ./scripts/start.sh          # Linux/macOS
-.\scripts\start.ps1         # Windows PowerShell
+.\scripts\start.ps1         # Windows PowerShell (also launches MCP Inspector on ports 5173/6274)
 
 # Start individual services
 uv run hr-engine            # FastAPI on port 8080 (kills port first)
@@ -21,8 +21,8 @@ uv run hr-mcp               # FastMCP 2 server on port 8081 (kills port first)
 uv run hr-seed              # Re-seed ChromaDB from sample_knowledge/
 uv run hr-seed --reset      # Clear ChromaDB and re-seed from scratch
 
-# MCP Inspector (requires Node.js)
-./scripts/start_mcp.sh      # Starts MCP server + opens Inspector
+# MCP Inspector standalone (requires Node.js; not needed if using start.ps1)
+npx @modelcontextprotocol/inspector uv run hr-mcp --stdio
 
 # Tests
 uv run pytest tests/ -v
@@ -116,7 +116,7 @@ See `README.md` for four Mermaid diagrams:
 | `src/contoso_hr/engine.py` | FastAPI: /api/chat, /api/chat/sessions, /api/upload, /api/candidates, /api/stats, /api/health, GET/DELETE /api/chat/history/{id}. Prints 4 URIs on startup (Web UI, API, Docs, MCP SSE). Builds past-session context (last 6 turns from last 2 sessions) for ChatConcierge. |
 | `src/contoso_hr/watcher/resume_watcher.py` | Polls data/incoming/ for .txt/.md/.pdf/.docx files every 3s |
 | `src/contoso_hr/watcher/process_resume.py` | Runs LangGraph pipeline and saves result to SQLite |
-| `src/contoso_hr/mcp_server/server.py` | FastMCP 2 server (SSE, port 8081) |
+| `src/contoso_hr/mcp_server/server.py` | FastMCP 2 server: all 5 MCP primitives (resources, resource templates, tools w/ sampling + elicitation, prompts). Supports SSE and stdio transport. |
 | `src/contoso_hr/util/port_utils.py` | `force_kill_port(port)` -- called on every startup |
 | `web/chat.html` / `web/chat.js` | Chat UI with upload, 6 suggestion buttons, new-chat/clear-history buttons, past sessions sidebar |
 | `web/candidates.html` / `web/candidates.js` | Candidate results grid with auto-refresh |
@@ -161,7 +161,14 @@ Chat UI features: "New chat" button (resets UI in-place, new session ID, no relo
 
 ### MCP Server (FastMCP 2)
 
-SSE transport at `http://localhost:8081/sse`. Tools: `get_candidate`, `list_candidates`, `trigger_resume_evaluation`, `query_policy`. Resources: `schema://candidate`, `stats://evaluations`, `samples://resumes`, `config://settings`. Prompts: `evaluate_resume`, `policy_query`.
+Supports both SSE (`http://localhost:8081/sse`) and stdio transport (`uv run hr-mcp --stdio`). The `__main__.py` entry point accepts a `--stdio` flag to switch transport mode.
+
+**Resources (static):** `schema://candidate`, `stats://evaluations`, `samples://resumes`, `config://settings`.
+**Resource Templates (dynamic):** `candidate://{candidate_id}`, `policy://{topic}`.
+**Tools:** `get_candidate`, `list_candidates`, `trigger_resume_evaluation`, `query_policy`, `generate_eval_summary` (uses **sampling** via `ctx.sample()`), `confirm_and_evaluate` (uses **elicitation** via `ctx.elicit()`).
+**Prompts:** `evaluate_resume` (multi-message), `policy_query` (multi-message), `disposition_review` (uses embedded Context resource).
+
+All five MCP primitives are covered: Resources, Resource Templates, Tools, Prompts, and Sampling/Elicitation.
 
 ## Code Conventions
 
