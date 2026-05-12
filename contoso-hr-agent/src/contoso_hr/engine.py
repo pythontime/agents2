@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -368,6 +370,135 @@ async def get_stats() -> dict:
 async def health() -> dict:
     """Health check endpoint."""
     return {"status": "ok", "service": "contoso-hr-agent"}
+
+
+# ---------------------------------------------------------------------------
+# Meta endpoint — snapshot of every persistent store the agent owns.
+# Used by web/meta.html to teach learners "what does the agent remember?"
+# ---------------------------------------------------------------------------
+
+def _stat_path(path: Path) -> dict:
+    """Common path metadata: exists, size_bytes, mtime ISO-8601."""
+    if not path.exists():
+        return {"path": str(path), "exists": False, "size_bytes": 0, "mtime": None}
+    if path.is_file():
+        size = path.stat().st_size
+    else:
+        size = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+    mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
+    return {"path": str(path), "exists": True, "size_bytes": size, "mtime": mtime}
+
+
+def _summarize_sqlite(db_path: Path, known_tables: Optional[list[str]] = None) -> dict:
+    """Row counts for each table in a SQLite file. Degrades gracefully on schema surprises."""
+    info = _stat_path(db_path)
+    info["tables"] = {}
+    if not info["exists"]:
+        return info
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            cur = conn.cursor()
+            if known_tables is None:
+                # Introspect (LangGraph checkpoints — schema is internal, may shift)
+                cur.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                )
+                tables = [row[0] for row in cur.fetchall()]
+            else:
+                tables = known_tables
+            for table in tables:
+                try:
+                    cur.execute(f"SELECT COUNT(*) FROM {table}")
+                    info["tables"][table] = cur.fetchone()[0]
+                except sqlite3.Error as exc:
+                    info["tables"][table] = {"error": str(exc)}
+        finally:
+            conn.close()
+    except sqlite3.Error as exc:
+        info["error"] = str(exc)
+    return info
+
+
+def _summarize_chroma(chroma_dir: Path) -> dict:
+    """ChromaDB collection inventory: count + distinct source filenames."""
+    info = _stat_path(chroma_dir)
+    info["collection"] = None
+    info["chunk_count"] = 0
+    info["doc_sources"] = []
+    if not info["exists"]:
+        return info
+    try:
+        import chromadb
+        from .knowledge.vectorizer import COLLECTION_NAME
+
+        client = chromadb.PersistentClient(path=str(chroma_dir))
+        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+        info["collection"] = COLLECTION_NAME
+        info["chunk_count"] = collection.count()
+        # Pull metadatas only — no embeddings or documents — so this stays cheap.
+        if info["chunk_count"] > 0:
+            sample = collection.get(include=["metadatas"], limit=10000)
+            sources = {m.get("source") for m in sample.get("metadatas", []) if m}
+            info["doc_sources"] = sorted(s for s in sources if s)
+    except Exception as exc:  # ChromaDB raises a wide tree of errors; one catch is fine here
+        info["error"] = f"{type(exc).__name__}: {exc}"
+    return info
+
+
+def _summarize_dir(dir_path: Path, glob_pattern: str) -> dict:
+    """File-count + total-size summary for a directory of matched files."""
+    info = _stat_path(dir_path)
+    info["file_count"] = 0
+    info["newest_mtime"] = None
+    if not info["exists"] or not dir_path.is_dir():
+        return info
+    files = list(dir_path.glob(glob_pattern))
+    info["file_count"] = len(files)
+    if files:
+        newest = max(files, key=lambda f: f.stat().st_mtime)
+        info["newest_mtime"] = datetime.fromtimestamp(
+            newest.stat().st_mtime, tz=timezone.utc
+        ).isoformat()
+    return info
+
+
+@app.get("/api/meta")
+async def get_meta() -> dict:
+    """Snapshot every persistent store the agent owns. Read-only, cheap, ~sub-100ms."""
+    config = get_config()
+    data_dir = config.data_dir
+    return {
+        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "data_dir": str(data_dir),
+        "stores": {
+            "hr_db": {
+                "label": "HR Evaluations (SQLite)",
+                "description": "Candidates + evaluations from the LangGraph pipeline.",
+                **_summarize_sqlite(data_dir / "hr.db", ["candidates", "evaluations"]),
+            },
+            "checkpoints_db": {
+                "label": "LangGraph Checkpoints (SQLite)",
+                "description": "Per-thread state snapshots written by SqliteSaver. Schema is internal to LangGraph.",
+                **_summarize_sqlite(data_dir / "checkpoints.db", None),
+            },
+            "chroma": {
+                "label": "ChromaDB Vector Store",
+                "description": "Embedded policy chunks for RAG retrieval.",
+                **_summarize_chroma(data_dir / "chroma"),
+            },
+            "chat_sessions": {
+                "label": "Chat Sessions (JSON)",
+                "description": "One JSON file per chat session — survives browser clears.",
+                **_summarize_dir(data_dir / "chat_sessions", "*.json"),
+            },
+            "outgoing": {
+                "label": "Pipeline Outputs (JSON)",
+                "description": "Full EvaluationResult written by the watcher after each pipeline run.",
+                **_summarize_dir(data_dir / "outgoing", "*.json"),
+            },
+        },
+    }
 
 
 # ---------------------------------------------------------------------------

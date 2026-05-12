@@ -58,6 +58,8 @@ function newSession() {
     <button class="suggestion-btn" onclick="sendSuggestion(this)">What makes a Strong Match candidate?</button>
     <button class="suggestion-btn" onclick="sendSuggestion(this)">How do I submit a resume for evaluation?</button>
     <button class="suggestion-btn" onclick="sendSuggestion(this)">What is Contoso's EEO policy?</button>
+    <button class="suggestion-btn" onclick="sendSuggestion(this)">What does Contoso policy say about trainer bonuses and compensation?</button>
+    <button class="suggestion-btn" onclick="sendSuggestion(this)">What learner-satisfaction score must trainers maintain per Contoso policy?</button>
   `;
 
   // Update session label and refresh past sessions list

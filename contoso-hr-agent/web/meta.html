@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory — Contoso HR Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .page { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+    .meta-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .meta-header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .meta-header .blurb {
+      font-size: 13px;
+      color: var(--contoso-gray-dark);
+      flex: 1;
+      min-width: 200px;
+    }
+    .meta-header .refresh-btn {
+      padding: 8px 16px;
+      border: 1px solid var(--contoso-blue);
+      background: var(--contoso-blue);
+      color: white;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .meta-header .refresh-btn:hover { background: #005A9E; border-color: #005A9E; }
+    .meta-header .timestamp {
+      font-size: 12px;
+      color: var(--contoso-gray-dark);
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    }
+
+    .stores-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .store-card {
+      padding: 18px;
+      border-left: 3px solid var(--contoso-blue);
+    }
+    .store-card.missing { border-left-color: var(--contoso-gray-dark); opacity: 0.7; }
+    .store-card .label {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+    .store-card .description {
+      font-size: 12px;
+      color: var(--contoso-gray-dark);
+      margin-bottom: 14px;
+      line-height: 1.4;
+    }
+    .store-card .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+    .store-card .row:first-of-type { border-top: none; }
+    .store-card .k { color: var(--contoso-gray-dark); }
+    .store-card .v {
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: right;
+    }
+    .store-card .v.highlight { color: var(--contoso-blue); font-weight: 600; }
+    .store-card .v.error { color: var(--contoso-red); }
+    .store-card .sources {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .store-card .sources-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--contoso-gray-dark);
+      margin-bottom: 6px;
+    }
+    .store-card .sources ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 12px;
+    }
+    .store-card .sources li {
+      padding: 2px 0;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    }
+
+    .empty-state, .error-state {
+      padding: 40px;
+      text-align: center;
+      color: var(--contoso-gray-dark);
+    }
+    .error-state { color: var(--contoso-red); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-logo">Contoso</div>
+    <div class="header-sub">HR Agent</div>
+    <nav class="header-nav">
+      <a href="chat.html">Chat</a>
+      <a href="candidates.html">Candidates</a>
+      <a href="runs.html">Pipeline Runs</a>
+      <a href="meta.html" class="active">Memory</a>
+    </nav>
+  </header>
+
+  <div class="page">
+    <div class="meta-header">
+      <h1>Agent Memory Stores</h1>
+      <div class="blurb">
+        Live snapshot of every persistent store the agent uses. Each card shows path,
+        size, row/file count, and last-modified time. Run a pipeline, then click Refresh
+        to see counts and timestamps change.
+      </div>
+      <span class="timestamp" id="generated-at">—</span>
+      <button class="refresh-btn" onclick="loadMeta()">Refresh</button>
+    </div>
+
+    <div class="stores-grid" id="stores-grid">
+      <div class="empty-state">Loading…</div>
+    </div>
+  </div>
+
+  <script>
+    function fmtBytes(n) {
+      if (n === 0) return "0 B";
+      const units = ["B", "KB", "MB", "GB"];
+      let i = 0;
+      while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+      return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+    }
+
+    function fmtTime(iso) {
+      if (!iso) return "—";
+      const d = new Date(iso);
+      return d.toLocaleString();
+    }
+
+    function renderRow(k, v, opts = {}) {
+      const cls = ["v"];
+      if (opts.highlight) cls.push("highlight");
+      if (opts.error) cls.push("error");
+      return `<div class="row"><span class="k">${k}</span><span class="${cls.join(" ")}" title="${v}">${v}</span></div>`;
+    }
+
+    function renderCard(key, store) {
+      const missing = !store.exists;
+      const cls = missing ? "card store-card missing" : "card store-card";
+      let rows = "";
+      rows += renderRow("Path", store.path);
+      rows += renderRow("Exists", store.exists ? "yes" : "no", { error: !store.exists });
+      rows += renderRow("Size", fmtBytes(store.size_bytes || 0));
+      rows += renderRow("Modified", fmtTime(store.mtime));
+
+      // Store-specific extras
+      if (store.tables) {
+        for (const [t, count] of Object.entries(store.tables)) {
+          if (typeof count === "object" && count.error) {
+            rows += renderRow(`Table ${t}`, count.error, { error: true });
+          } else {
+            rows += renderRow(`Table ${t}`, `${count} rows`, { highlight: true });
+          }
+        }
+      }
+      if (store.chunk_count !== undefined) {
+        rows += renderRow("Collection", store.collection || "—");
+        rows += renderRow("Chunks", store.chunk_count, { highlight: true });
+      }
+      if (store.file_count !== undefined) {
+        rows += renderRow("Files", store.file_count, { highlight: true });
+        if (store.newest_mtime) {
+          rows += renderRow("Newest file", fmtTime(store.newest_mtime));
+        }
+      }
+      if (store.error) {
+        rows += renderRow("Error", store.error, { error: true });
+      }
+
+      let sources = "";
+      if (store.doc_sources && store.doc_sources.length) {
+        sources = `
+          <div class="sources">
+            <div class="sources-title">Ingested documents (${store.doc_sources.length})</div>
+            <ul>${store.doc_sources.map(s => `<li>${s}</li>`).join("")}</ul>
+          </div>`;
+      }
+
+      return `
+        <div class="${cls}">
+          <div class="label">${store.label}</div>
+          <div class="description">${store.description}</div>
+          ${rows}
+          ${sources}
+        </div>`;
+    }
+
+    async function loadMeta() {
+      const grid = document.getElementById("stores-grid");
+      grid.innerHTML = `<div class="empty-state">Loading…</div>`;
+      try {
+        const resp = await fetch("/api/meta");
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        document.getElementById("generated-at").textContent =
+          "Snapshot: " + new Date(data.generated_at).toLocaleString();
+        const order = ["hr_db", "checkpoints_db", "chroma", "chat_sessions", "outgoing"];
+        grid.innerHTML = order
+          .filter(k => data.stores[k])
+          .map(k => renderCard(k, data.stores[k]))
+          .join("");
+      } catch (err) {
+        grid.innerHTML = `<div class="error-state">Failed to load /api/meta: ${err.message}</div>`;
+      }
+    }
+
+    loadMeta();
+  </script>
+</body>
+</html>
