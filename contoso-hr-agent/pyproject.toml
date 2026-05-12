@@ -2,7 +2,7 @@
 name = "contoso-hr"
 version = "0.1.0"
 description = "Contoso HR Agent: AI-powered resume screening and HR policy Q&A"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "O'Reilly Training" }]
