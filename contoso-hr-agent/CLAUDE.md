@@ -21,8 +21,10 @@ uv venv && uv sync && uv run hr-seed      # creates venv, installs deps, seeds C
 .\scripts\stop.ps1
 ./scripts/stop.sh
 
-# Smoke test (one-shot end-to-end pipeline run, ~50s)
-uv run python smoke_test.py # Drops Alice Zhang resume, asserts Strong Match
+# Acceptance test (one-shot end-to-end pipeline run, ~50s)
+uv run python smoke_test.py # Submits Alice Zhang text; asserts Strong Match + score >= 80
+                            # Exit codes: 0 pass, 2 fixture missing, 3 pipeline None,
+                            #             4 disposition mismatch, 5 score below threshold
 
 # Individual services (rarely needed if start.ps1 is used)
 uv run hr-engine            # FastAPI on port 8090 (kills port first)

@@ -53,8 +53,10 @@ uv run hr-mcp --stdio       # FastMCP 2 stdio transport (for MCP Inspector)
 uv run hr-seed              # Re-seed ChromaDB from sample_knowledge/
 uv run hr-seed --reset      # Clear ChromaDB and re-seed from scratch
 
-# Smoke test (one-shot end-to-end pipeline run, ~50s)
-uv run python smoke_test.py # Drops Alice Zhang resume, asserts Strong Match
+# Acceptance test (one-shot end-to-end pipeline run, ~50s)
+uv run python smoke_test.py # Submits Alice Zhang text; asserts Strong Match + score >= 80
+                            # Exit codes: 0 pass, 2 fixture missing, 3 pipeline None,
+                            #             4 disposition mismatch, 5 score below threshold
 ```
 
 Engine startup prints four URIs: Web UI (8090), API, Docs, MCP SSE (8091).
